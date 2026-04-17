@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  /* Ambient glows — not expressible as Tailwind utilities */
+  .ambient-glow-primary {
+    box-shadow: 0 0 40px rgba(222, 142, 255, 0.08);
+  }
+  .ambient-glow-secondary {
+    box-shadow: 0 0 40px rgba(0, 244, 254, 0.08);
+  }
+  .text-glow-tertiary {
+    text-shadow: 0 0 20px rgba(188, 255, 95, 0.4);
+  }
+
+  /* Pulse CTA: gradient shifts right on hover, mimicking a bass kick */
+  .btn-pulse {
+    background-size: 200% auto;
+    transition: background-position 0.3s ease, box-shadow 0.3s ease;
+  }
+  .btn-pulse:hover {
+    background-position: right center;
+    box-shadow: 0 0 20px rgba(222, 142, 255, 0.4);
+  }
+
+  /* Parallax image: JS sets --scroll-y via useEffect; images move at 0.9x */
+  .parallax-image {
+    will-change: transform;
+    transform: translateY(calc(var(--scroll-y, 0px) * 0.1));
+    transition: transform 0.1s linear;
+  }
+}
