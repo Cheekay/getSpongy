@@ -53,6 +53,9 @@ describe('getRouteAccess', () => {
     expect(getRouteAccess('/queue', {})).toBe('redirect-explore')
     expect(getRouteAccess('/queue', { attendee: true })).toBe('redirect-explore')
   })
+  it('redirects organizer without dj role from studio routes', () => {
+    expect(getRouteAccess('/queue', { organizer: true })).toBe('redirect-explore')
+  })
   it('allows manage routes for organizer role', () => {
     expect(getRouteAccess('/events', { organizer: true })).toBe('allow')
     expect(getRouteAccess('/analytics', { organizer: true })).toBe('allow')

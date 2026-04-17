@@ -6,9 +6,14 @@ export type RoleFlags = {
   organizer: boolean
 }
 
+export type RouteAccess = 'allow' | 'redirect-explore'
+
 const DEEP_LINK_PATTERN = /^\/e\//
 const PUBLIC_ROUTES = ['/login', '/verify']
 const STUDIO_ROUTES = ['/queue', '/stats']
+// NOTE: startsWith prefix guard — ALL sub-paths under /events/* and /analytics/* are
+// organizer-only by design. Do NOT add attendee-facing routes under these prefixes;
+// use a different top-level path (e.g. /discover) instead.
 const MANAGE_ROUTES = ['/events', '/analytics']
 
 export function hasRole(roleFlags: Partial<RoleFlags>, role: UserRole): boolean {
@@ -29,8 +34,6 @@ export function getDefaultRoute(roleFlags: Partial<RoleFlags>): string {
     default:          return '/explore'
   }
 }
-
-export type RouteAccess = 'allow' | 'redirect-explore'
 
 export function getRouteAccess(pathname: string, roleFlags: Partial<RoleFlags>): RouteAccess {
   if (DEEP_LINK_PATTERN.test(pathname)) return 'allow'
