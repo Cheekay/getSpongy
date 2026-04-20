@@ -163,7 +163,7 @@ export default async function EventDetailPage({
           </Link>
         )}
         {event.state === 'ended' && (
-          <Link href={`/manage/events/${event.id}/analytics`}>
+          <Link href={`/events/${event.id}/analytics`}>
             <Button variant="secondary" className="w-full">View Analytics →</Button>
           </Link>
         )}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { subscribeToRequests, type RequestPayload } from '@/lib/supabase/realtime'
 import { submitRequest, withdrawRequest } from '@/lib/actions/requests'
+import { toggleUpvote } from '@/lib/actions/upvotes'
 import type { SpotifyTrack } from '@/lib/spotify'
 import dynamic from 'next/dynamic'
 const TipModal = dynamic(() => import('./TipModal'), { ssr: false })
@@ -27,6 +28,9 @@ export default function LiveClient({
   initialMyRequest: RequestPayload | null
 }) {
   const [myRequest, setMyRequest] = useState<RequestPayload | null>(initialMyRequest)
+  const [upvoteCount, setUpvoteCount] = useState(initialMyRequest?.upvote_count ?? 0)
+  const [voted, setVoted] = useState(false)
+  const [upvoting, setUpvoting] = useState(false)
   const [paused, setPaused] = useState(event.requests_paused)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SpotifyTrack[]>([])
@@ -41,7 +45,10 @@ export default function LiveClient({
   // Watch own request state changes via realtime
   useEffect(() => {
     const unsub = subscribeToRequests(event.id, (payload) => {
-      if (payload.user_id === userId) setMyRequest(payload)
+      if (payload.user_id === userId) {
+        setMyRequest(payload)
+        setUpvoteCount(payload.upvote_count)
+      }
     })
     return unsub
   }, [event.id, userId])
@@ -124,6 +131,24 @@ export default function LiveClient({
     setMyRequest(null)
   }
 
+  async function handleUpvote() {
+    if (!myRequest || myRequest.state !== 'pending' || upvoting) return
+    const prev = { voted, count: upvoteCount }
+    setVoted((v) => !v)
+    setUpvoteCount((c) => prev.voted ? Math.max(0, c - 1) : c + 1)
+    setUpvoting(true)
+
+    const result = await toggleUpvote(myRequest.id)
+    setUpvoting(false)
+    if (result.error) {
+      setVoted(prev.voted)
+      setUpvoteCount(prev.count)
+    } else {
+      setVoted(result.voted!)
+      setUpvoteCount(result.count!)
+    }
+  }
+
   // Paused state
   if (paused) {
     const etaMin = event.requests_paused_until
@@ -181,6 +206,19 @@ export default function LiveClient({
               <p className={`text-xs mt-1 font-label font-semibold ${statusLabelClass}`}>
                 {statusLabel}
               </p>
+              {myRequest.state === 'pending' && (
+                <button
+                  onClick={handleUpvote}
+                  disabled={upvoting}
+                  className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-label font-semibold transition-colors ${
+                    voted
+                      ? 'bg-primary text-on-primary'
+                      : 'bg-surface-container-highest text-on-surface-variant'
+                  }`}
+                >
+                  ↑ {upvoteCount} {voted ? 'Upvoted' : 'Upvote'}
+                </button>
+              )}
             </div>
             {myRequest.state === 'pending' && (
               <button onClick={handleWithdraw} className="text-on-surface-variant text-xs shrink-0">
