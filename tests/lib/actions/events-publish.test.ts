@@ -51,7 +51,7 @@ describe('publishEvent', () => {
   it('publishes free event without Stripe check', async () => {
     mockSupabaseClient.from
       .mockReturnValueOnce(makeQuery({ data: { rsvp_type: 'free', state: 'draft', organizer_id: 'org-user' } }))
-      .mockReturnValueOnce(makeQuery({ error: null }))
+      .mockReturnValueOnce(makeQuery({ data: [{ id: 'event-1' }], error: null }))
     const result = await publishEvent('event-1')
     expect(result.error).toBeUndefined()
   })
@@ -60,8 +60,16 @@ describe('publishEvent', () => {
     mockSupabaseClient.from
       .mockReturnValueOnce(makeQuery({ data: { rsvp_type: 'paid', state: 'draft', organizer_id: 'org-user' } }))
       .mockReturnValueOnce(makeQuery({ data: { stripe_connect_onboarded: true } }))
-      .mockReturnValueOnce(makeQuery({ error: null }))
+      .mockReturnValueOnce(makeQuery({ data: [{ id: 'event-1' }], error: null }))
     const result = await publishEvent('event-1')
     expect(result.error).toBeUndefined()
+  })
+
+  it('returns error when event is not in draft state', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { rsvp_type: 'free', state: 'published', organizer_id: 'org-user' } }))
+      .mockReturnValueOnce(makeQuery({ data: [], error: null }))
+    const result = await publishEvent('event-1')
+    expect(result.error).toBe('Event is not in draft state')
   })
 })

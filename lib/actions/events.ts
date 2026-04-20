@@ -80,14 +80,16 @@ export async function publishEvent(eventId: string): Promise<PublishEventResult>
     }
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('events')
     .update({ state: 'published' })
     .eq('id', eventId)
     .eq('organizer_id', user.id)
     .eq('state', 'draft')
+    .select('id')
 
   if (error) return { error: error.message }
+  if (!updated || updated.length === 0) return { error: 'Event is not in draft state' }
   revalidatePath('/events')
   revalidatePath(`/events/${eventId}`)
   return {}
@@ -113,13 +115,15 @@ export async function updateTipSettings(
   const tipsEnabled = formData.get('tipsEnabled') === 'on'
   const minTipCents = Math.max(100, parseInt(formData.get('minTipCents') as string, 10) || 100)
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('events')
     .update({ tips_enabled: tipsEnabled, min_tip_cents: minTipCents })
     .eq('id', eventId)
     .eq('organizer_id', user.id)
+    .select('id')
 
   if (error) return { error: error.message }
+  if (!updated || updated.length === 0) return { error: 'Event not found' }
   revalidatePath(`/events/${eventId}`)
   return {}
 }
