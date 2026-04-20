@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { verifyQrJwt } from '@/lib/jwt'
 
 export function isDuplicateCheckIn(status: string): boolean {
   return status === 'checked_in'
@@ -77,4 +78,19 @@ export async function checkInGuest(rsvpId: string): Promise<{
   if (error) return { error: error.message }
   revalidatePath(`/events/${rsvp.event_id}/door`)
   return { checkedInAt: now }
+}
+
+export async function verifyAndCheckIn(qrJwt: string): Promise<{
+  duplicate?: boolean
+  checkedInAt?: string
+  error?: string
+}> {
+  let payload: { rsvpId: string }
+  try {
+    payload = await verifyQrJwt(qrJwt)
+  } catch {
+    return { error: 'Invalid QR code' }
+  }
+
+  return checkInGuest(payload.rsvpId)
 }
