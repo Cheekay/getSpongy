@@ -5,7 +5,7 @@ export type SpotifyTrack = {
   id: string
   title: string
   artist: string
-  albumArtUrl: string
+  albumArtUrl: string | null
   durationMs: number
 }
 
@@ -34,8 +34,18 @@ async function getAccessToken(): Promise<string> {
   return cachedToken!
 }
 
-// Implemented in Phase 2
-export async function searchTracks(_query: string): Promise<SpotifyTrack[]> {
-  await getAccessToken() // validates credentials are set
-  throw new Error('searchTracks: not yet implemented (Phase 2)')
+export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
+  const token = await getAccessToken()
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=8&market=US`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return []
+  const data = await res.json()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data.tracks.items.map((item: any) => ({
+    id: item.id,
+    title: item.name,
+    artist: item.artists.map((a: { name: string }) => a.name).join(', '),
+    albumArtUrl: item.album.images[0]?.url ?? null,
+    durationMs: item.duration_ms,
+  }))
 }
