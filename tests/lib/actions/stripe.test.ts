@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockUser = { id: 'user-123' }
 let mockAuthUser: { id: string } | null = mockUser
@@ -44,6 +44,11 @@ describe('initiateStripeConnect', () => {
     vi.clearAllMocks()
     mockAuthUser = mockUser
     mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: mockAuthUser } })
+    process.env.NEXT_PUBLIC_APP_URL = 'https://test.example.com'
+  })
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_APP_URL
   })
 
   it('returns error when not authenticated', async () => {
