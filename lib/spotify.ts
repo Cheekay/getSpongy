@@ -9,11 +9,17 @@ export type SpotifyTrack = {
   durationMs: number
 }
 
+const SEARCH_LIMIT = 8
+
 let cachedToken: string | null = null
 let tokenExpiry = 0
 
 async function getAccessToken(): Promise<string> {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken
+
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    throw new Error('SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set')
+  }
 
   const credentials = Buffer.from(
     `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
@@ -28,7 +34,9 @@ async function getAccessToken(): Promise<string> {
     body: 'grant_type=client_credentials',
   } as RequestInit & { next?: { revalidate?: number } })
 
+  if (!res.ok) throw new Error(`Spotify auth failed: ${res.status}`)
   const data = await res.json()
+  if (!data.access_token) throw new Error('Spotify auth returned no token')
   cachedToken = data.access_token
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000
   return cachedToken!
@@ -36,7 +44,7 @@ async function getAccessToken(): Promise<string> {
 
 export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
   const token = await getAccessToken()
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=8&market=US`
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${SEARCH_LIMIT}&market=US`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) return []
   const data = await res.json()
@@ -45,7 +53,7 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
     id: item.id,
     title: item.name,
     artist: item.artists.map((a: { name: string }) => a.name).join(', '),
-    albumArtUrl: item.album.images[0]?.url ?? null,
+    albumArtUrl: item.album?.images?.[0]?.url ?? null,
     durationMs: item.duration_ms,
   }))
 }
