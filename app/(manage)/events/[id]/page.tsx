@@ -4,6 +4,24 @@ import Link from 'next/link'
 import { Chip } from '@/components/ui/Chip'
 import { Button } from '@/components/ui/Button'
 import DjAssignForm from './DjAssignForm'
+import { publishEvent, updateTipSettings } from '@/lib/actions/events'
+import { initiateStripeConnect } from '@/lib/actions/stripe'
+import { stripe } from '@/lib/stripe'
+import { unstable_cache } from 'next/cache'
+
+async function getPayoutStatus(accountId: string): Promise<'not_connected' | 'pending' | 'connected'> {
+  const getCached = unstable_cache(
+    async (id: string) => {
+      const account = await stripe.accounts.retrieve(id)
+      if (account.payouts_enabled) return 'connected' as const
+      if (account.details_submitted) return 'pending' as const
+      return 'not_connected' as const
+    },
+    ['payout-status'],
+    { revalidate: 300 }
+  )
+  return getCached(accountId)
+}
 
 export default async function EventDetailPage({
   params,
@@ -17,13 +35,23 @@ export default async function EventDetailPage({
 
   const { data: event } = await supabase
     .from('events')
-    .select('id, title, start_at, end_at, timezone, venue_name, state, event_code, cover_image_url, description, organizer_id, dj_id')
+    .select('id, title, start_at, end_at, timezone, venue_name, state, event_code, cover_image_url, description, organizer_id, dj_id, rsvp_type, tips_enabled, min_tip_cents')
     .eq('id', id)
     .single()
 
   if (!event || event.organizer_id !== user.id) notFound()
 
-  // Fetch DJ name if assigned
+  const { data: userData } = await supabase
+    .from('users')
+    .select('stripe_connect_account_id, stripe_connect_onboarded')
+    .eq('id', user.id)
+    .single()
+
+  let payoutStatus: 'not_connected' | 'pending' | 'connected' = 'not_connected'
+  if (userData?.stripe_connect_account_id) {
+    payoutStatus = await getPayoutStatus(userData.stripe_connect_account_id)
+  }
+
   let djName: string | null = null
   if (event.dj_id) {
     const { data: djUser } = await supabase
@@ -36,6 +64,7 @@ export default async function EventDetailPage({
 
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/e/${event.event_code}`
   const storyUrl = `/api/story?eventId=${event.id}`
+  const isLiveOrEnded = ['live', 'ended'].includes(event.state)
 
   return (
     <main className="px-4 py-6 pb-24 space-y-6">
@@ -46,11 +75,7 @@ export default async function EventDetailPage({
       </div>
 
       {event.cover_image_url && (
-        <img
-          src={event.cover_image_url}
-          alt="Event cover"
-          className="w-full aspect-video object-cover rounded-xl"
-        />
+        <img src={event.cover_image_url} alt="Event cover" className="w-full aspect-video object-cover rounded-xl" />
       )}
 
       <div className="bg-surface-container-low rounded-xl p-4 space-y-3">
@@ -59,6 +84,44 @@ export default async function EventDetailPage({
           <p className="text-secondary text-sm truncate">{shareUrl}</p>
         </div>
       </div>
+
+      {/* Stripe Connect status */}
+      <div className="bg-surface-container-low rounded-xl p-4 space-y-3">
+        <p className="text-on-surface-variant text-xs uppercase tracking-wider">Stripe Payouts</p>
+        <div className="flex items-center justify-between">
+          <PayoutChip status={payoutStatus} />
+          {payoutStatus === 'not_connected' && (
+            <form action={initiateStripeConnect}>
+              <button type="submit" className="text-secondary text-sm font-label font-semibold">
+                Connect Stripe →
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* Tip settings (immutable once live) */}
+      {event.rsvp_type === 'paid' && !isLiveOrEnded && (
+        <form action={updateTipSettings.bind(null, event.id)} className="bg-surface-container-low rounded-xl p-4 space-y-3">
+          <p className="text-on-surface-variant text-xs uppercase tracking-wider">Tip Settings</p>
+          <label className="flex items-center justify-between">
+            <span className="text-on-surface text-sm">Allow tips</span>
+            <input type="checkbox" name="tipsEnabled" defaultChecked={event.tips_enabled} className="accent-primary" />
+          </label>
+          <div className="space-y-1">
+            <label className="text-on-surface-variant text-xs">Minimum tip (cents)</label>
+            <input
+              type="number"
+              name="minTipCents"
+              defaultValue={event.min_tip_cents}
+              min={100}
+              step={50}
+              className="w-full bg-surface-container-highest rounded-lg px-3 py-2 text-on-surface text-sm focus:outline-none focus:ring-1 focus:ring-secondary"
+            />
+          </div>
+          <button type="submit" className="text-secondary text-sm font-label font-semibold">Save</button>
+        </form>
+      )}
 
       {/* DJ assignment */}
       <div className="bg-surface-container-low rounded-xl p-4 space-y-3">
@@ -72,6 +135,18 @@ export default async function EventDetailPage({
       </div>
 
       <div className="space-y-3">
+        {event.state === 'draft' && (
+          <form action={publishEvent.bind(null, event.id)}>
+            <button type="submit" className="w-full py-3 rounded-full bg-primary text-on-primary font-label font-semibold">
+              Publish Event
+            </button>
+          </form>
+        )}
+        {event.state === 'published' && (
+          <Link href={`/manage/events/${event.id}/tiers`}>
+            <Button variant="secondary" className="w-full">Manage Ticket Tiers →</Button>
+          </Link>
+        )}
         {event.state === 'live' && (
           <Link href={`/events/${event.id}/door`}>
             <Button className="w-full">Manage Door →</Button>
@@ -80,6 +155,11 @@ export default async function EventDetailPage({
         {(event.state === 'live' || event.state === 'ended') && (
           <Link href="/queue">
             <Button variant="secondary" className="w-full">Open DJ Dashboard →</Button>
+          </Link>
+        )}
+        {event.state === 'ended' && (
+          <Link href={`/manage/events/${event.id}/analytics`}>
+            <Button variant="secondary" className="w-full">View Analytics →</Button>
           </Link>
         )}
         <a href={storyUrl} download>
@@ -95,4 +175,10 @@ function StateChip({ state }: { state: string }) {
   if (state === 'published') return <Chip variant="pending">UPCOMING</Chip>
   if (state === 'draft') return <Chip variant="pending">DRAFT</Chip>
   return <Chip variant="played">ENDED</Chip>
+}
+
+function PayoutChip({ status }: { status: 'not_connected' | 'pending' | 'connected' }) {
+  if (status === 'connected') return <Chip variant="live">Payouts Active</Chip>
+  if (status === 'pending') return <Chip variant="pending">Verification Pending</Chip>
+  return <Chip variant="played">Not Connected</Chip>
 }
