@@ -40,14 +40,12 @@ export async function toggleUpvote(
   if (existing) {
     const { error: delError } = await admin.from('upvotes').delete().eq('id', existing.id)
     if (delError) return { error: delError.message }
-    const { data: newCount, error: rpcError } = await admin.rpc('adjust_upvote_count', { p_request_id: requestId, p_delta: -1 })
-    if (rpcError) return { error: rpcError.message }
-    return { voted: false, count: newCount ?? 0 }
+    const newCount = Math.max(0, (request.upvote_count ?? 0) - 1)
+    return { voted: false, count: newCount }
   } else {
     const { error: insError } = await admin.from('upvotes').insert({ request_id: requestId, user_id: user.id })
     if (insError) return { error: insError.message }
-    const { data: newCount, error: rpcError } = await admin.rpc('adjust_upvote_count', { p_request_id: requestId, p_delta: 1 })
-    if (rpcError) return { error: rpcError.message }
-    return { voted: true, count: newCount ?? 0 }
+    const newCount = (request.upvote_count ?? 0) + 1
+    return { voted: true, count: newCount }
   }
 }

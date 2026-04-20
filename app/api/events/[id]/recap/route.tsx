@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export async function GET(
@@ -7,15 +8,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return new NextResponse('Unauthorized', { status: 401 })
+
   const admin = createServiceClient()
 
   const { data: event } = await admin
     .from('events')
-    .select('id, title, start_at, state')
+    .select('id, title, start_at, state, organizer_id')
     .eq('id', id)
     .single()
 
-  if (!event) return new NextResponse('Event not found', { status: 404 })
+  if (!event || event.organizer_id !== user.id) return new NextResponse('Not found', { status: 404 })
   if (event.state !== 'ended') return new NextResponse('Not available yet', { status: 404 })
 
   const [attendanceResult, topTracksResult] = await Promise.all([
@@ -55,7 +61,6 @@ export async function GET(
           gap: '24px',
         }}
       >
-        {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ color: '#de8eff', fontSize: '18px', fontWeight: 700 }}>Spongy Recap</span>
           <span
@@ -71,7 +76,6 @@ export async function GET(
           <span style={{ color: '#acaab1', fontSize: '20px' }}>{dateStr}</span>
         </div>
 
-        {/* Stats */}
         <div style={{ display: 'flex', gap: '24px' }}>
           <div
             style={{
@@ -87,7 +91,6 @@ export async function GET(
           </div>
         </div>
 
-        {/* Top 3 tracks */}
         {topTracks.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <span style={{ color: '#acaab1', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -112,7 +115,6 @@ export async function GET(
           </div>
         )}
 
-        {/* Footer */}
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center' }}>
           <span style={{ color: '#de8eff', fontSize: '16px', fontWeight: 700 }}>spongy.app</span>
         </div>
@@ -123,7 +125,7 @@ export async function GET(
       height: 630,
       headers: {
         'Content-Disposition': 'attachment; filename="spongy-recap.png"',
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'private, max-age=86400',
       },
     }
   )
