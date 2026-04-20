@@ -2,11 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { rsvpToEvent } from '@/lib/actions/rsvp'
+import { createPaymentIntent } from '@/lib/actions/checkout'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { QRCodeSVG } from 'qrcode.react'
 import { format } from 'date-fns-tz'
+
+const PaymentForm = dynamic(() => import('./PaymentForm'), { ssr: false })
+
+type Tier = { id: string; name: string; price_cents: number; inventory: number | null; sold_count: number; active: boolean }
 
 type EventPageClientProps = {
   event: {
@@ -21,6 +27,7 @@ type EventPageClientProps = {
     state: string
     capacity: number | null
     event_code: string
+    rsvp_type: string
     organizer: { name: string } | null
   }
   user: { id: string } | null
@@ -29,15 +36,20 @@ type EventPageClientProps = {
   rsvpCount: number
   atCapacity: boolean
   appUrl: string
+  tiers: Tier[]
 }
 
 export default function EventPageClient({
-  event, user, hasProfile, existingRsvp, rsvpCount, atCapacity, appUrl,
+  event, user, hasProfile, existingRsvp, rsvpCount, atCapacity, appUrl, tiers,
 }: EventPageClientProps) {
   const router = useRouter()
   const [rsvp, setRsvp] = useState(existingRsvp)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedTier, setSelectedTier] = useState<Tier | null>(null)
+  const [checkoutSecret, setCheckoutSecret] = useState<string | null>(null)
+  const [checkoutRsvpId, setCheckoutRsvpId] = useState<string | null>(null)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
 
   const eventUrl = `${appUrl}/e/${event.event_code}`
   const dateStr = format(new Date(event.start_at), 'EEE MMM d · h:mm a zzz', { timeZone: event.timezone })
@@ -57,6 +69,23 @@ export default function EventPageClient({
     if (result.error) { setError(result.error); setLoading(false); return }
     setRsvp({ id: result.rsvpId!, qr_jwt: result.qrJwt! })
     setLoading(false)
+  }
+
+  async function handleSelectTier(tier: Tier) {
+    setSelectedTier(tier)
+    setPaymentError(null)
+    if (!user) { router.push(`/login?redirect=/e/${event.event_code}`); return }
+    if (!hasProfile) { router.push(`/setup?redirect=/e/${event.event_code}`); return }
+    setLoading(true)
+    const result = await createPaymentIntent({ eventId: event.id, tierId: tier.id })
+    setLoading(false)
+    if (result.error) { setPaymentError(result.error); return }
+    setCheckoutSecret(result.clientSecret!)
+    setCheckoutRsvpId(result.rsvpId!)
+  }
+
+  function handlePaymentSuccess(qrJwt: string) {
+    setRsvp({ id: checkoutRsvpId!, qr_jwt: qrJwt })
   }
 
   if (rsvp?.qr_jwt) {
@@ -101,17 +130,54 @@ export default function EventPageClient({
 
       {error && <p className="mx-4 mt-2 text-error text-sm">{error}</p>}
 
-      {/* Sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-surface-container-lowest flex items-center gap-4">
-        <span className="text-on-surface-variant text-sm">Free Event</span>
-        <Button
-          className="flex-1"
-          onClick={handleRsvp}
-          disabled={loading || atCapacity}
-        >
-          {atCapacity ? 'Event Full' : loading ? 'RSVPing…' : 'RSVP Free'}
-        </Button>
-      </div>
+      {event.rsvp_type === 'paid' ? (
+        <div className="px-4 py-4 space-y-4">
+          {!checkoutSecret && (
+            <div className="space-y-3">
+              <p className="font-label font-semibold text-on-surface">Choose your ticket</p>
+              {tiers.map((tier) => {
+                const soldOut = tier.inventory !== null && tier.sold_count >= tier.inventory
+                return (
+                  <button
+                    key={tier.id}
+                    onClick={() => !soldOut && handleSelectTier(tier)}
+                    disabled={soldOut || loading}
+                    className={`w-full flex items-center justify-between rounded-xl p-4 text-left transition-colors ${
+                      soldOut ? 'bg-surface-container opacity-50 cursor-not-allowed' : 'bg-surface-container-low active:bg-surface-container'
+                    } ${selectedTier?.id === tier.id ? 'ring-2 ring-primary' : ''}`}
+                  >
+                    <span className="font-label font-semibold text-on-surface">{tier.name}</span>
+                    <span className="text-on-surface-variant text-sm">
+                      {soldOut ? 'Sold out' : `$${(tier.price_cents / 100).toFixed(2)}`}
+                    </span>
+                  </button>
+                )
+              })}
+              {paymentError && <p className="text-error text-sm">{paymentError}</p>}
+            </div>
+          )}
+          {checkoutSecret && checkoutRsvpId && (
+            <PaymentForm
+              clientSecret={checkoutSecret}
+              rsvpId={checkoutRsvpId}
+              onSuccess={handlePaymentSuccess}
+              onError={(msg) => { setPaymentError(msg); setCheckoutSecret(null) }}
+            />
+          )}
+        </div>
+      ) : (
+        /* Free RSVP sticky CTA */
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-surface-container-lowest flex items-center gap-4">
+          <span className="text-on-surface-variant text-sm">Free Event</span>
+          <Button
+            className="flex-1"
+            onClick={handleRsvp}
+            disabled={loading || atCapacity}
+          >
+            {atCapacity ? 'Event Full' : loading ? 'RSVPing…' : 'RSVP Free'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
