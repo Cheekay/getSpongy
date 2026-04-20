@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 import { subscribeToRequests, type RequestPayload } from '@/lib/supabase/realtime'
 import { submitRequest, withdrawRequest } from '@/lib/actions/requests'
 import type { SpotifyTrack } from '@/lib/spotify'
@@ -40,6 +41,30 @@ export default function LiveClient({
     return unsub
   }, [event.id, userId])
 
+  // Watch event pause state via realtime
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+    const channel = supabase
+      .channel(`event-pause-${event.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'events', filter: `id=eq.${event.id}` },
+        (payload) => {
+          setPaused((payload.new as { requests_paused: boolean }).requests_paused)
+        },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [event.id])
+
+  // Clear debounce timer on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
   // Countdown for rate limit
   useEffect(() => {
     if (!retryAfter || retryAfter <= 0) { setRetryAfter(null); return }
@@ -53,9 +78,14 @@ export default function LiveClient({
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (!q.trim() || q.length < 2) { setResults([]); return }
     debounceRef.current = setTimeout(async () => {
-      const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
-      setResults(data.tracks ?? [])
+      try {
+        const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(q)}`)
+        if (!res.ok) { setResults([]); return }
+        const data = await res.json()
+        setResults(data.tracks ?? [])
+      } catch {
+        setResults([])
+      }
     }, 300)
   }, [])
 
@@ -84,7 +114,8 @@ export default function LiveClient({
 
   async function handleWithdraw() {
     if (!myRequest) return
-    await withdrawRequest(myRequest.id)
+    const result = await withdrawRequest(myRequest.id)
+    if (result.error) return
     setMyRequest(null)
   }
 
@@ -168,6 +199,7 @@ export default function LiveClient({
         <div className="flex flex-col gap-4">
           <input
             type="search"
+            aria-label="Search for a song"
             placeholder="Search for a song…"
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
@@ -210,7 +242,7 @@ export default function LiveClient({
                   <p className="font-label font-semibold text-on-surface truncate">{selected.title}</p>
                   <p className="text-on-surface-variant text-sm truncate">{selected.artist}</p>
                 </div>
-                <button onClick={() => setSelected(null)} className="text-on-surface-variant px-2 shrink-0">
+                <button onClick={() => setSelected(null)} aria-label="Remove selected track" className="text-on-surface-variant px-2 shrink-0">
                   ✕
                 </button>
               </div>
