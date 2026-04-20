@@ -82,6 +82,11 @@ export default async function EventDetailPage({
             <Button variant="secondary" className="w-full">Open DJ Dashboard →</Button>
           </Link>
         )}
+        {event.state === 'ended' && (
+          <Link href={`/events/${event.id}/analytics`}>
+            <Button variant="secondary" className="w-full">View Analytics →</Button>
+          </Link>
+        )}
         <a href={storyUrl} download>
           <Button variant="secondary" className="w-full">Download IG Story</Button>
         </a>
