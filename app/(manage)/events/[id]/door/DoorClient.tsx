@@ -9,7 +9,7 @@ import {
   updateCachedGuestStatus,
   queueCheckIn,
   getCheckInQueue,
-  clearCheckInQueue,
+  removeFromCheckInQueue,
   type OfflineGuest,
 } from '@/lib/offline'
 import type { GuestRow } from '@/lib/actions/checkin'
@@ -69,9 +69,13 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
     const queue = getCheckInQueue(eventId)
     if (queue.length === 0) return
     for (const item of queue) {
-      await checkInGuest(item.rsvpId)
+      try {
+        await checkInGuest(item.rsvpId)
+        removeFromCheckInQueue(eventId, item.rsvpId)
+      } catch {
+        // leave failed items in queue for next reconnect
+      }
     }
-    clearCheckInQueue(eventId)
   }
 
   const filtered = useMemo(() => {
@@ -93,7 +97,7 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
     setTimeout(() => setToast(null), 3000)
   }
 
-  function applyCheckIn(rsvpId: string) {
+  const applyCheckIn = useCallback((rsvpId: string) => {
     const now = new Date().toISOString()
     setGuests((prev) =>
       prev.map((g) =>
@@ -101,7 +105,7 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
       )
     )
     updateCachedGuestStatus(eventId, rsvpId)
-  }
+  }, [eventId])
 
   async function handleCheckIn(rsvpId: string) {
     const prev = guests
@@ -169,7 +173,7 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
       } catch { /* local state will sync on next page load */ }
       showToast('Checked in ✓', 'ok')
     }
-  }, [eventId, isOnline]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eventId, isOnline, applyCheckIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex flex-col">

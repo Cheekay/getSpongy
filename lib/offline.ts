@@ -84,3 +84,19 @@ export function getCheckInQueue(eventId: string): QueuedCheckIn[] {
 export function clearCheckInQueue(eventId: string): void {
   storage().removeItem(queueKey(eventId))
 }
+
+export function removeFromCheckInQueue(eventId: string, rsvpId: string): void {
+  const raw = storage().getItem(queueKey(eventId))
+  if (!raw) return
+  try {
+    const queue = JSON.parse(raw) as QueuedCheckIn[]
+    const updated = queue.filter((q) => q.rsvpId !== rsvpId)
+    if (updated.length === 0) {
+      storage().removeItem(queueKey(eventId))
+    } else {
+      storage().setItem(queueKey(eventId), JSON.stringify(updated))
+    }
+  } catch {
+    // corrupt queue — ignore
+  }
+}

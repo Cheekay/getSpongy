@@ -7,6 +7,7 @@ import {
   queueCheckIn,
   getCheckInQueue,
   clearCheckInQueue,
+  removeFromCheckInQueue,
 } from '@/lib/offline'
 
 const EVENT_ID = 'ev-test'
@@ -79,5 +80,14 @@ describe('check-in queue', () => {
     queueCheckIn(EVENT_ID, 'r1')
     clearCheckInQueue(EVENT_ID)
     expect(getCheckInQueue(EVENT_ID)).toHaveLength(0)
+  })
+
+  it('removeFromCheckInQueue removes only the specified rsvpId', () => {
+    queueCheckIn(EVENT_ID, 'r1')
+    queueCheckIn(EVENT_ID, 'r2')
+    removeFromCheckInQueue(EVENT_ID, 'r1')
+    const remaining = getCheckInQueue(EVENT_ID)
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].rsvpId).toBe('r2')
   })
 })
