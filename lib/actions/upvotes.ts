@@ -38,14 +38,16 @@ export async function toggleUpvote(
   const admin = createServiceClient()
 
   if (existing) {
-    await admin.from('upvotes').delete().eq('id', existing.id)
-    const newCount = Math.max(0, (request.upvote_count ?? 0) - 1)
-    await admin.from('song_requests').update({ upvote_count: newCount }).eq('id', requestId)
-    return { voted: false, count: newCount }
+    const { error: delError } = await admin.from('upvotes').delete().eq('id', existing.id)
+    if (delError) return { error: delError.message }
+    const { data: newCount, error: rpcError } = await admin.rpc('adjust_upvote_count', { p_request_id: requestId, p_delta: -1 })
+    if (rpcError) return { error: rpcError.message }
+    return { voted: false, count: newCount ?? 0 }
   } else {
-    await admin.from('upvotes').insert({ request_id: requestId, user_id: user.id })
-    const newCount = (request.upvote_count ?? 0) + 1
-    await admin.from('song_requests').update({ upvote_count: newCount }).eq('id', requestId)
-    return { voted: true, count: newCount }
+    const { error: insError } = await admin.from('upvotes').insert({ request_id: requestId, user_id: user.id })
+    if (insError) return { error: insError.message }
+    const { data: newCount, error: rpcError } = await admin.rpc('adjust_upvote_count', { p_request_id: requestId, p_delta: 1 })
+    if (rpcError) return { error: rpcError.message }
+    return { voted: true, count: newCount ?? 0 }
   }
 }

@@ -11,7 +11,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabaseClient),
 }))
 
-const mockServiceClient = { from: vi.fn() }
+const mockServiceClient = { from: vi.fn(), rpc: vi.fn() }
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => mockServiceClient),
 }))
@@ -67,9 +67,8 @@ describe('toggleUpvote', () => {
       .mockReturnValueOnce(makeQuery({ data: { state: 'pending', event_id: 'e-1', upvote_count: 2 }, error: null }))
       .mockReturnValueOnce(makeQuery({ data: { status: 'checked_in' }, error: null }))
       .mockReturnValueOnce(makeQuery({ data: null, error: null })) // no existing upvote
-    mockServiceClient.from
-      .mockReturnValueOnce(makeQuery({ error: null })) // insert upvote
-      .mockReturnValueOnce(makeQuery({ error: null })) // update upvote_count
+    mockServiceClient.from.mockReturnValueOnce(makeQuery({ error: null })) // insert upvote
+    mockServiceClient.rpc.mockResolvedValueOnce({ data: 3, error: null })
 
     const result = await toggleUpvote('req-1')
     expect(result.voted).toBe(true)
@@ -81,9 +80,8 @@ describe('toggleUpvote', () => {
       .mockReturnValueOnce(makeQuery({ data: { state: 'pending', event_id: 'e-1', upvote_count: 5 }, error: null }))
       .mockReturnValueOnce(makeQuery({ data: { status: 'checked_in' }, error: null }))
       .mockReturnValueOnce(makeQuery({ data: { id: 'uv-1' }, error: null })) // existing upvote found
-    mockServiceClient.from
-      .mockReturnValueOnce(makeQuery({ error: null })) // delete upvote
-      .mockReturnValueOnce(makeQuery({ error: null })) // update upvote_count
+    mockServiceClient.from.mockReturnValueOnce(makeQuery({ error: null })) // delete upvote
+    mockServiceClient.rpc.mockResolvedValueOnce({ data: 4, error: null })
 
     const result = await toggleUpvote('req-1')
     expect(result.voted).toBe(false)
