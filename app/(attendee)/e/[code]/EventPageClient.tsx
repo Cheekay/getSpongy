@@ -100,7 +100,7 @@ export default function EventPageClient({
           <img src={event.cover_image_url} alt={event.title} className="w-full h-full object-cover rounded-b-xl" />
         )}
         <div className="absolute bottom-3 left-3">
-          <Chip variant="live">FREE ENTRY</Chip>
+          {event.rsvp_type === 'free' && <Chip variant="live">FREE ENTRY</Chip>}
         </div>
       </div>
 

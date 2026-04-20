@@ -88,7 +88,7 @@ export default async function EventCodePage({ params }: Props) {
       existingRsvp={existingRsvp}
       rsvpCount={rsvpCount}
       atCapacity={atCapacity}
-      appUrl={process.env.NEXT_PUBLIC_APP_URL!}
+      appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ''}
       tiers={tiers}
     />
   )
