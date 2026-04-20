@@ -3,8 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { stripe } from '@/lib/stripe'
+import { redirect } from 'next/navigation'
 
-export async function initiateStripeConnect(): Promise<{ url?: string; error?: string }> {
+export async function initiateStripeConnect(): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -49,5 +50,5 @@ export async function initiateStripeConnect(): Promise<{ url?: string; error?: s
     return { error: 'Failed to create onboarding link' }
   }
 
-  return { url: accountLink.url }
+  redirect(accountLink.url)
 }

@@ -9,18 +9,23 @@ import { initiateStripeConnect } from '@/lib/actions/stripe'
 import { stripe } from '@/lib/stripe'
 import { unstable_cache } from 'next/cache'
 
-async function getPayoutStatus(accountId: string): Promise<'not_connected' | 'pending' | 'connected'> {
-  const getCached = unstable_cache(
-    async (id: string) => {
+const getCachedPayoutStatus = unstable_cache(
+  async (id: string) => {
+    try {
       const account = await stripe.accounts.retrieve(id)
       if (account.payouts_enabled) return 'connected' as const
       if (account.details_submitted) return 'pending' as const
       return 'not_connected' as const
-    },
-    ['payout-status'],
-    { revalidate: 300 }
-  )
-  return getCached(accountId)
+    } catch {
+      return 'not_connected' as const
+    }
+  },
+  ['payout-status'],
+  { revalidate: 300 }
+)
+
+async function getPayoutStatus(accountId: string): Promise<'not_connected' | 'pending' | 'connected'> {
+  return getCachedPayoutStatus(accountId)
 }
 
 export default async function EventDetailPage({

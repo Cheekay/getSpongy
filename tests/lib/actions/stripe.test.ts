@@ -38,6 +38,7 @@ function makeQuery(result: unknown) {
 
 import { initiateStripeConnect } from '@/lib/actions/stripe'
 import { stripe } from '@/lib/stripe'
+import { redirect } from 'next/navigation'
 
 describe('initiateStripeConnect', () => {
   beforeEach(() => {
@@ -66,7 +67,7 @@ describe('initiateStripeConnect', () => {
     expect(result.error).toBe('Already connected')
   })
 
-  it('creates account, stores account_id, returns accountLink url', async () => {
+  it('creates account, stores account_id, and redirects to accountLink url', async () => {
     mockSupabaseClient.from.mockReturnValue(
       makeQuery({ data: { stripe_connect_onboarded: false, stripe_connect_account_id: null } })
     )
@@ -74,9 +75,9 @@ describe('initiateStripeConnect', () => {
     vi.mocked(stripe.accountLinks.create).mockResolvedValue({ url: 'https://connect.stripe.com/setup/...' } as never)
     mockServiceClient.from.mockReturnValue(makeQuery({ error: null }))
 
-    const result = await initiateStripeConnect()
-    expect(result.url).toBe('https://connect.stripe.com/setup/...')
+    await initiateStripeConnect()
     expect(stripe.accounts.create).toHaveBeenCalledWith({ type: 'express' })
     expect(mockServiceClient.from).toHaveBeenCalledWith('users')
+    expect(redirect).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\//))
   })
 })
