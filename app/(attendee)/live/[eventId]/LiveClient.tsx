@@ -5,12 +5,16 @@ import { createBrowserClient } from '@supabase/ssr'
 import { subscribeToRequests, type RequestPayload } from '@/lib/supabase/realtime'
 import { submitRequest, withdrawRequest } from '@/lib/actions/requests'
 import type { SpotifyTrack } from '@/lib/spotify'
+import dynamic from 'next/dynamic'
+const TipModal = dynamic(() => import('./TipModal'), { ssr: false })
 
 type EventData = {
   id: string
   title: string
   requests_paused: boolean
   requests_paused_until: string | null
+  tips_enabled: boolean
+  min_tip_cents: number
 }
 
 export default function LiveClient({
@@ -31,6 +35,7 @@ export default function LiveClient({
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
+  const [tipRequestId, setTipRequestId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Watch own request state changes via realtime
@@ -165,23 +170,33 @@ export default function LiveClient({
 
       {/* My active request */}
       {isRequestActive && myRequest && (
-        <div className={`rounded-2xl p-4 flex gap-3 items-start ${statusCardClass}`}>
-          {myRequest.album_art_url && (
-            <img src={myRequest.album_art_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="font-label font-semibold text-on-surface truncate">{myRequest.track_title}</p>
-            <p className="text-on-surface-variant text-sm truncate">{myRequest.track_artist}</p>
-            <p className={`text-xs mt-1 font-label font-semibold ${statusLabelClass}`}>
-              {statusLabel}
-            </p>
+        <>
+          <div className={`rounded-2xl p-4 flex gap-3 items-start ${statusCardClass}`}>
+            {myRequest.album_art_url && (
+              <img src={myRequest.album_art_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-label font-semibold text-on-surface truncate">{myRequest.track_title}</p>
+              <p className="text-on-surface-variant text-sm truncate">{myRequest.track_artist}</p>
+              <p className={`text-xs mt-1 font-label font-semibold ${statusLabelClass}`}>
+                {statusLabel}
+              </p>
+            </div>
+            {myRequest.state === 'pending' && (
+              <button onClick={handleWithdraw} className="text-on-surface-variant text-xs shrink-0">
+                Cancel
+              </button>
+            )}
           </div>
-          {myRequest.state === 'pending' && (
-            <button onClick={handleWithdraw} className="text-on-surface-variant text-xs shrink-0">
-              Cancel
+          {myRequest.state === 'pending' && event.tips_enabled && (
+            <button
+              onClick={() => setTipRequestId(myRequest.id)}
+              className="mt-2 px-4 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant text-xs font-label font-semibold"
+            >
+              💰 Tip to boost
             </button>
           )}
-        </div>
+        </>
       )}
 
       {/* Rate limit countdown */}
@@ -271,6 +286,15 @@ export default function LiveClient({
             </div>
           )}
         </div>
+      )}
+
+      {tipRequestId && (
+        <TipModal
+          requestId={tipRequestId}
+          minTipCents={event.min_tip_cents}
+          onSuccess={() => setTipRequestId(null)}
+          onClose={() => setTipRequestId(null)}
+        />
       )}
     </main>
   )
