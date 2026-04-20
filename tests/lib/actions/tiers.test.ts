@@ -85,8 +85,39 @@ describe('deleteTier', () => {
   it('deletes tier when sold_count is 0', async () => {
     mockSupabaseClient.from
       .mockReturnValueOnce(makeQuery({ data: { sold_count: 0, event: { organizer_id: 'org-user' } }, error: null }))
-      .mockReturnValueOnce(makeQuery({ error: null }))
+      .mockReturnValueOnce(makeQuery({ data: [{ id: 'tier-1' }], error: null }))
     const result = await deleteTier('tier-1')
     expect(result.error).toBeUndefined()
+  })
+})
+
+describe('updateTier', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuthUser = mockUser
+    mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: mockAuthUser } })
+  })
+
+  it('returns error when not authenticated', async () => {
+    mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: null } })
+    const result = await updateTier('tier-abc', { name: 'VIP' })
+    expect(result.error).toBe('Not authenticated')
+  })
+
+  it('returns error when tier not owned by user', async () => {
+    mockSupabaseClient.from.mockReturnValue(
+      makeQuery({ data: { event_id: 'event-1', event: { organizer_id: 'other-user' } }, error: null })
+    )
+    const result = await updateTier('tier-abc', { name: 'VIP' })
+    expect(result.error).toBe('Not authorized')
+  })
+
+  it('returns {} on successful update', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { event_id: 'event-1', event: { organizer_id: 'org-user' } }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: [{ id: 'tier-abc' }], error: null }))
+    const result = await updateTier('tier-abc', { name: 'VIP' })
+    expect(result.error).toBeUndefined()
+    expect(result).toEqual({})
   })
 })

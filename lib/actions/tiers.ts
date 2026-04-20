@@ -56,8 +56,13 @@ export async function updateTier(
   if (patch.inventory !== undefined) update.inventory = patch.inventory
   if (patch.active !== undefined) update.active = patch.active
 
-  const { error } = await supabase.from('ticket_tiers').update(update).eq('id', tierId)
+  const { data: updated, error } = await supabase
+    .from('ticket_tiers')
+    .update(update)
+    .eq('id', tierId)
+    .select('id')
   if (error) return { error: error.message }
+  if (!updated || updated.length === 0) return { error: 'Tier not found' }
 
   revalidatePath(`/manage/events/${tier.event_id}/tiers`)
   return {}
@@ -78,8 +83,13 @@ export async function deleteTier(tierId: string): Promise<{ error?: string }> {
   if (!tier || eventData?.organizer_id !== user.id) return { error: 'Not authorized' }
   if ((tier.sold_count ?? 0) > 0) return { error: 'Cannot delete a tier with sold tickets' }
 
-  const { error } = await supabase.from('ticket_tiers').delete().eq('id', tierId)
+  const { data: deleted, error } = await supabase
+    .from('ticket_tiers')
+    .delete()
+    .eq('id', tierId)
+    .select('id')
   if (error) return { error: error.message }
+  if (!deleted || deleted.length === 0) return { error: 'Tier not found' }
 
   revalidatePath(`/manage/events/${tier.event_id}/tiers`)
   return {}
