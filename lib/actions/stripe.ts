@@ -1,0 +1,54 @@
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { stripe } from '@/lib/stripe'
+import { redirect } from 'next/navigation'
+
+export async function initiateStripeConnect(): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('stripe_connect_onboarded, stripe_connect_account_id')
+    .eq('id', user.id)
+    .single()
+
+  if (userData?.stripe_connect_onboarded) return { error: 'Already connected' }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) return { error: 'App URL not configured' }
+
+  let account: { id: string }
+  try {
+    account = await stripe.accounts.create({ type: 'express' })
+  } catch {
+    return { error: 'Failed to create Stripe account' }
+  }
+
+  const admin = createServiceClient()
+  const { error: updateError } = await admin
+    .from('users')
+    .update({ stripe_connect_account_id: account.id })
+    .eq('id', user.id)
+
+  if (updateError) {
+    return { error: 'Setup failed, please try again' }
+  }
+
+  let accountLink: { url: string }
+  try {
+    accountLink = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: `${appUrl}/events?stripe=refresh`,
+      return_url: `${appUrl}/api/stripe/connect/callback?account_id=${account.id}`,
+      type: 'account_onboarding',
+    })
+  } catch {
+    return { error: 'Failed to create onboarding link' }
+  }
+
+  redirect(accountLink.url)
+}

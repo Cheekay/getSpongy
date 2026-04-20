@@ -11,7 +11,7 @@ type EventData = {
   requests_paused_until: string | null
 }
 
-type SortMode = 'newest' | 'upvotes'
+type SortMode = 'newest' | 'upvotes' | 'tips'
 
 type UndoItem = {
   requestId: string
@@ -60,11 +60,11 @@ export default function QueueClient({
     return unsub
   }, [event.id])
 
-  const sorted = [...requests].sort((a, b) =>
-    sort === 'upvotes'
-      ? b.upvote_count - a.upvote_count
-      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+  const sorted = [...requests].sort((a, b) => {
+    if (sort === 'upvotes') return b.upvote_count - a.upvote_count || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    if (sort === 'tips') return b.tip_cents - a.tip_cents || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
 
   const handleModerate = useCallback(
     async (requestId: string, action: ModerateAction) => {
@@ -133,10 +133,10 @@ export default function QueueClient({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setSort((s) => (s === 'newest' ? 'upvotes' : 'newest'))}
+            onClick={() => setSort((s) => s === 'newest' ? 'upvotes' : s === 'upvotes' ? 'tips' : 'newest')}
             className="px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-sm font-label"
           >
-            {sort === 'newest' ? '↓ Newest' : '↑ Top'}
+            {sort === 'newest' ? '↓ Newest' : sort === 'upvotes' ? '↑ Top Voted' : '💰 Tips First'}
           </button>
           <button
             onClick={handlePause}
@@ -209,8 +209,12 @@ function RequestCard({
               &quot;{request.shoutout_text}&quot;
             </p>
           )}
-          <p className="text-on-surface-variant text-xs mt-1">
-            ♥ {request.upvote_count} · {formatTimeAgo(request.created_at)} ago
+          <p className="text-on-surface-variant text-xs mt-1 flex items-center gap-2">
+            <span>↑ {request.upvote_count}</span>
+            {request.tip_cents > 0 && (
+              <span className="text-tertiary font-semibold">💰 ${(request.tip_cents / 100).toFixed(2)}</span>
+            )}
+            <span>· {formatTimeAgo(request.created_at)} ago</span>
           </p>
         </div>
       </div>

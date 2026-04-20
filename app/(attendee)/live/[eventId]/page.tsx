@@ -15,7 +15,7 @@ export default async function LiveEventPage({
   const [eventResult, rsvpResult, myRequestResult] = await Promise.all([
     supabase
       .from('events')
-      .select('id, title, state, event_code, requests_paused, requests_paused_until')
+      .select('id, title, state, event_code, requests_paused, requests_paused_until, tips_enabled, min_tip_cents')
       .eq('id', eventId)
       .single(),
     supabase

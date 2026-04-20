@@ -69,6 +69,17 @@ export default async function EventCodePage({ params }: Props) {
     ? !!(await supabase.from('users').select('name').eq('id', user.id).single()).data?.name
     : false
 
+  const tiersResult = event.rsvp_type === 'paid'
+    ? await supabase
+        .from('ticket_tiers')
+        .select('id, name, price_cents, inventory, sold_count, active')
+        .eq('event_id', event.id)
+        .eq('active', true)
+        .order('price_cents', { ascending: true })
+    : { data: [] }
+
+  const tiers = tiersResult.data ?? []
+
   return (
     <EventPageClient
       event={event as any}
@@ -77,7 +88,8 @@ export default async function EventCodePage({ params }: Props) {
       existingRsvp={existingRsvp}
       rsvpCount={rsvpCount}
       atCapacity={atCapacity}
-      appUrl={process.env.NEXT_PUBLIC_APP_URL!}
+      appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ''}
+      tiers={tiers}
     />
   )
 }
