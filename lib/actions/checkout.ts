@@ -64,19 +64,25 @@ export async function createPaymentIntent(params: {
 
   const applicationFee = Math.floor(tier.price_cents * 0.03) + 99
 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: tier.price_cents,
-    currency: 'usd',
-    application_fee_amount: applicationFee,
-    transfer_data: { destination: organizerData.stripe_connect_account_id },
-    metadata: {
-      rsvp_id: rsvp.id,
-      tier_id: tierId,
-      event_id: eventId,
-      user_id: user.id,
-      amount: String(tier.price_cents),
-    },
-  })
+  let paymentIntent: { id: string; client_secret: string | null }
+  try {
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: tier.price_cents,
+      currency: 'usd',
+      application_fee_amount: applicationFee,
+      transfer_data: { destination: organizerData.stripe_connect_account_id },
+      metadata: {
+        rsvp_id: rsvp.id,
+        tier_id: tierId,
+        event_id: eventId,
+        user_id: user.id,
+        amount: String(tier.price_cents),
+      },
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Payment setup failed'
+    return { error: msg }
+  }
 
   await admin
     .from('rsvps')
@@ -92,7 +98,13 @@ export async function markRsvpPaid(params: {
 }): Promise<{ qrJwt?: string; error?: string }> {
   const { rsvpId, paymentIntentId } = params
 
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+  let paymentIntent: Awaited<ReturnType<typeof stripe.paymentIntents.retrieve>>
+  try {
+    paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to verify payment'
+    return { error: msg }
+  }
   if (paymentIntent.status !== 'succeeded') return { error: 'Payment not yet completed' }
 
   const supabase = await createClient()

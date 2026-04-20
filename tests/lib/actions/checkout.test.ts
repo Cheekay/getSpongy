@@ -88,6 +88,9 @@ describe('createPaymentIntent', () => {
 
     const result = await createPaymentIntent({ eventId: 'e-1', tierId: 't-1' })
     expect(result.clientSecret).toBe('pi_123_secret')
+    expect(vi.mocked(stripe.paymentIntents.create)).toHaveBeenCalledWith(
+      expect.objectContaining({ application_fee_amount: 159 })
+    )
   })
 })
 
