@@ -133,3 +133,44 @@ describe('pauseRequests', () => {
     expect(result.error).toBeUndefined()
   })
 })
+
+describe('assignDj', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuthUser = mockUser
+    mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: mockAuthUser } })
+  })
+
+  it('returns error when caller is not the organizer', async () => {
+    // Event has a different organizer_id
+    mockSupabaseClient.from.mockReturnValue(
+      makeQuery({ data: { organizer_id: 'other-org' } })
+    )
+    const result = await assignDj('ev-1', '+14155550000')
+    expect(result.error).toBe('Not authorized')
+  })
+
+  it('returns error when no user found with that phone', async () => {
+    // Event: caller is organizer
+    mockSupabaseClient.from.mockReturnValue(
+      makeQuery({ data: { organizer_id: 'dj-user' } })
+    )
+    // Service client: user lookup returns null
+    mockServiceClient.from
+      .mockReturnValueOnce(makeQuery({ data: null }))          // users select
+    const result = await assignDj('ev-1', '+14155559999')
+    expect(result.error).toBe('No account found with that phone number')
+  })
+
+  it('assigns DJ and returns djName on success', async () => {
+    mockSupabaseClient.from.mockReturnValue(
+      makeQuery({ data: { organizer_id: 'dj-user' } })
+    )
+    mockServiceClient.from
+      .mockReturnValueOnce(makeQuery({ data: { id: 'dj-id-123', name: 'DJ Kalani' } })) // users select
+      .mockReturnValueOnce(makeQuery({ error: null }))                                    // events update
+    const result = await assignDj('ev-1', '+14155550001')
+    expect(result.error).toBeUndefined()
+    expect(result.djName).toBe('DJ Kalani')
+  })
+})
