@@ -209,8 +209,9 @@ function RequestCard({
               &quot;{request.shoutout_text}&quot;
             </p>
           )}
-          <p className="text-on-surface-variant text-xs mt-1">
-            ♥ {request.upvote_count} · {formatTimeAgo(request.created_at)} ago
+          <p className="text-on-surface-variant text-xs mt-1 flex items-center gap-2">
+            <span>↑ {request.upvote_count}</span>
+            <span>· {formatTimeAgo(request.created_at)} ago</span>
           </p>
         </div>
       </div>
