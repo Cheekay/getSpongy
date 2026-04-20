@@ -24,23 +24,25 @@ export default function DjAssignForm({ eventId }: { eventId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
-      <input
-        type="tel"
-        placeholder="DJ's phone number"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        className="flex-1 rounded-xl bg-surface-container-highest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary"
-      />
-      <button
-        type="submit"
-        disabled={submitting}
-        className="px-3 py-2 rounded-xl bg-secondary text-on-secondary text-sm font-label font-semibold disabled:opacity-50"
-      >
-        {submitting ? '…' : 'Assign'}
-      </button>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        <input
+          type="tel"
+          placeholder="DJ's phone number"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="flex-1 rounded-xl bg-surface-container-highest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary"
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="px-3 py-2 rounded-xl bg-secondary text-on-secondary text-sm font-label font-semibold disabled:opacity-50"
+        >
+          {submitting ? '…' : 'Assign'}
+        </button>
+      </div>
       {status && (
-        <p className={`text-xs mt-1 ${status.startsWith('DJ assigned') ? 'text-tertiary' : 'text-error'}`}>
+        <p className={`text-xs ${status.startsWith('DJ assigned') ? 'text-tertiary' : 'text-error'}`}>
           {status}
         </p>
       )}
