@@ -29,7 +29,7 @@ export async function createTier(
     .single()
 
   if (error || !tier) return { error: error?.message || 'Failed to create tier' }
-  revalidatePath(`/manage/events/${eventId}/tiers`)
+  revalidatePath(`/events/${eventId}/tiers`)
   return { tierId: tier.id }
 }
 
@@ -64,7 +64,7 @@ export async function updateTier(
   if (error) return { error: error.message }
   if (!updated || updated.length === 0) return { error: 'Tier not found' }
 
-  revalidatePath(`/manage/events/${tier.event_id}/tiers`)
+  revalidatePath(`/events/${tier.event_id}/tiers`)
   return {}
 }
 
@@ -91,6 +91,6 @@ export async function deleteTier(tierId: string): Promise<{ error?: string }> {
   if (error) return { error: error.message }
   if (!deleted || deleted.length === 0) return { error: 'Tier not found' }
 
-  revalidatePath(`/manage/events/${tier.event_id}/tiers`)
+  revalidatePath(`/events/${tier.event_id}/tiers`)
   return {}
 }
