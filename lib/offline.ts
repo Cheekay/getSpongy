@@ -10,9 +10,16 @@ type OfflineCache = {
   guests: OfflineGuest[]
 }
 
-type QueuedCheckIn = {
+export type QueuedCheckIn = {
   rsvpId: string
   queuedAt: string
+}
+
+function storage(): Storage {
+  if (typeof window === 'undefined') {
+    throw new Error('[offline] localStorage is not available in a server context')
+  }
+  return window.localStorage
 }
 
 const guestKey  = (eventId: string) => `spongy_offline_${eventId}`
@@ -20,41 +27,60 @@ const queueKey  = (eventId: string) => `spongy_queue_${eventId}`
 
 export function cacheGuestList(eventId: string, guests: OfflineGuest[]): void {
   const cache: OfflineCache = { downloadedAt: new Date().toISOString(), guests }
-  localStorage.setItem(guestKey(eventId), JSON.stringify(cache))
+  storage().setItem(guestKey(eventId), JSON.stringify(cache))
 }
 
 export function getCachedGuestList(eventId: string): OfflineGuest[] | null {
-  const raw = localStorage.getItem(guestKey(eventId))
+  const raw = storage().getItem(guestKey(eventId))
   if (!raw) return null
-  return (JSON.parse(raw) as OfflineCache).guests
+  try {
+    return (JSON.parse(raw) as OfflineCache).guests
+  } catch {
+    return null
+  }
 }
 
 export function updateCachedGuestStatus(eventId: string, rsvpId: string): void {
-  const raw = localStorage.getItem(guestKey(eventId))
+  const raw = storage().getItem(guestKey(eventId))
   if (!raw) return
-  const cache = JSON.parse(raw) as OfflineCache
+  let cache: OfflineCache
+  try {
+    cache = JSON.parse(raw) as OfflineCache
+  } catch {
+    return
+  }
   cache.guests = cache.guests.map((g) =>
     g.id === rsvpId
       ? { ...g, status: 'checked_in', checked_in_at: new Date().toISOString() }
       : g
   )
-  localStorage.setItem(guestKey(eventId), JSON.stringify(cache))
+  storage().setItem(guestKey(eventId), JSON.stringify(cache))
 }
 
 export function queueCheckIn(eventId: string, rsvpId: string): void {
-  const raw = localStorage.getItem(queueKey(eventId))
-  const queue: QueuedCheckIn[] = raw ? JSON.parse(raw) : []
+  const raw = storage().getItem(queueKey(eventId))
+  let queue: QueuedCheckIn[]
+  try {
+    queue = raw ? JSON.parse(raw) : []
+  } catch {
+    queue = []
+  }
   if (!queue.find((q) => q.rsvpId === rsvpId)) {
     queue.push({ rsvpId, queuedAt: new Date().toISOString() })
-    localStorage.setItem(queueKey(eventId), JSON.stringify(queue))
+    storage().setItem(queueKey(eventId), JSON.stringify(queue))
   }
 }
 
 export function getCheckInQueue(eventId: string): QueuedCheckIn[] {
-  const raw = localStorage.getItem(queueKey(eventId))
-  return raw ? JSON.parse(raw) : []
+  const raw = storage().getItem(queueKey(eventId))
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as QueuedCheckIn[]
+  } catch {
+    return []
+  }
 }
 
 export function clearCheckInQueue(eventId: string): void {
-  localStorage.removeItem(queueKey(eventId))
+  storage().removeItem(queueKey(eventId))
 }
