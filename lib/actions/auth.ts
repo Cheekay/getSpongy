@@ -2,19 +2,30 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getDefaultRoute } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
+function toE164US(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  // strip leading 1 if 11 digits, then prepend +1
+  const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits
+  return `+1${ten}`
+}
+
 export async function sendOtp(
-  _prev: { error?: string },
+  _prev: { error?: string; success?: boolean; phone?: string },
   formData: FormData
-): Promise<{ error?: string }> {
-  const phone = (formData.get('phone') as string)?.trim()
-  if (!phone) return { error: 'Phone number is required' }
+): Promise<{ error?: string; success?: boolean; phone?: string }> {
+  const raw = (formData.get('phone') as string)?.trim()
+  if (!raw) return { error: 'Phone number is required' }
+
+  const phone = toE164US(raw)
+  if (phone.length !== 12) return { error: 'Enter a valid 10-digit US number' }
 
   const supabase = await createClient()
   const { error } = await supabase.auth.signInWithOtp({ phone })
   if (error) return { error: error.message }
-  return {}
+  return { success: true, phone }
 }
 
 export async function verifyOtp(
@@ -34,14 +45,25 @@ export async function verifyOtp(
 
   const { data: profile } = await supabase
     .from('users')
-    .select('name')
+    .select('name, role_flags')
     .eq('id', user.id)
     .single()
 
   if (!profile?.name) {
     redirect(`/setup?redirect=${encodeURIComponent(redirectTo)}`)
   }
-  redirect(redirectTo)
+
+  // Use role-based default when no explicit deep-link redirect was requested
+  const destination = redirectTo === '/explore'
+    ? getDefaultRoute(profile.role_flags ?? {})
+    : redirectTo
+  redirect(destination)
+}
+
+export async function signOut(): Promise<void> {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
 }
 
 export async function saveName(
@@ -58,13 +80,15 @@ export async function saveName(
   if (!user) return { error: 'Not authenticated' }
 
   const admin = createServiceClient()
+  const roleFlags = { attendee: true, dj: false, organizer: false }
   const { error } = await admin.from('users').insert({
     id: user.id,
     phone: user.phone!,
     name,
-    role_flags: { attendee: true, dj: false, organizer: false },
+    role_flags: roleFlags,
   })
   if (error) return { error: error.message }
 
-  redirect(redirectTo)
+  const destination = redirectTo === '/explore' ? getDefaultRoute(roleFlags) : redirectTo
+  redirect(destination)
 }

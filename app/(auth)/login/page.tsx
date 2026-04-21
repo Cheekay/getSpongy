@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { useRef, useEffect } from 'react'
+import { useEffect } from 'react'
 import { sendOtp } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -21,15 +21,13 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/explore'
   const router = useRouter()
-  const phoneRef = useRef<HTMLInputElement>(null)
 
-  const [state, action] = useActionState(sendOtp, {})
+  const [state, action] = useActionState(sendOtp, { success: false })
 
   useEffect(() => {
-    if (!state.error && Object.keys(state).length > 0) {
-      const phone = phoneRef.current?.value || ''
+    if (state.success && state.phone) {
       router.push(
-        `/verify?phone=${encodeURIComponent(phone)}&redirect=${encodeURIComponent(redirectTo)}`
+        `/verify?phone=${encodeURIComponent(state.phone)}&redirect=${encodeURIComponent(redirectTo)}`
       )
     }
   }, [state, redirectTo, router])
@@ -51,7 +49,6 @@ export default function LoginPage() {
               +1
             </span>
             <Input
-              ref={phoneRef}
               name="phone"
               type="tel"
               placeholder="(555) 000-0000"
