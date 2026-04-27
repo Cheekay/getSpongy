@@ -24,6 +24,12 @@ export async function GET(
   if (!event || event.organizer_id !== user.id) return new NextResponse('Not found', { status: 404 })
   if (event.state !== 'ended') return new NextResponse('Not available yet', { status: 404 })
 
+  const { data: organizer } = await admin
+    .from('users')
+    .select('brand_logo_url, brand_hide_watermark')
+    .eq('id', event.organizer_id)
+    .single()
+
   const [attendanceResult, topTracksResult] = await Promise.all([
     admin
       .from('rsvps')
@@ -117,6 +123,9 @@ export async function GET(
 
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center' }}>
           <span style={{ color: '#de8eff', fontSize: '16px', fontWeight: 700 }}>spongy.app</span>
+          {!(organizer?.brand_hide_watermark) && (
+            <span style={{ marginLeft: '8px', color: '#acaab1', fontSize: '12px' }}>Made with Spongy</span>
+          )}
         </div>
       </div>
     ),
