@@ -22,7 +22,7 @@ export default async function ManageLayout({ children }: { children: React.React
           ✦ Upgrade to Pro — unlock custom branding, team seats & more →
         </a>
       )}
-      <div className="flex-1 pb-20">
+      <div id="main-content" className="flex-1 pb-20">
         {children}
       </div>
       <BottomNav variant="manage" />

@@ -3,10 +3,10 @@ import { Button } from '@/components/ui/Button'
 
 export default function ProfilePage() {
   return (
-    <main className="px-4 py-6 space-y-8">
+    <main className="px-4 py-6 pb-24 space-y-8">
       <div>
-        <h1 className="font-headline text-4xl font-bold">Pulse Profile</h1>
-        <p className="text-on-surface-variant mt-2">User profile & stats — Phase 2</p>
+        <h1 className="font-headline text-2xl font-bold">Profile</h1>
+        <p className="text-on-surface-variant mt-1 text-sm">Account settings — coming soon.</p>
       </div>
 
       <form action={signOut}>

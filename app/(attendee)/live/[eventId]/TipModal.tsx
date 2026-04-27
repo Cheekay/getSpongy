@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { submitTip } from '@/lib/actions/tips'
@@ -29,6 +29,36 @@ function TipFormInner({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
+
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const modal = modalRef.current
+    if (!modal) return
+
+    const focusable = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    )
+    focusable[0]?.focus()
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!first || !last) return
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   const amountCents = preset ?? (customAmount ? Math.round(parseFloat(customAmount) * 100) : 0)
 
@@ -65,12 +95,16 @@ function TipFormInner({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={onClose}>
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Send a tip"
         className="w-full max-w-md bg-surface rounded-t-3xl p-6 space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h2 className="font-headline text-xl font-bold">Send a Tip</h2>
-          <button onClick={onClose} className="text-on-surface-variant text-2xl">✕</button>
+          <button onClick={onClose} aria-label="Close tip modal" className="text-on-surface-variant text-2xl hover:opacity-80 transition-opacity">✕</button>
         </div>
 
         <div className="flex gap-3">
