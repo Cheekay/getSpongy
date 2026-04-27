@@ -15,14 +15,14 @@ vi.mock('stripe', () => {
 import Stripe from 'stripe'
 
 describe('stripe singleton', () => {
-  it('exports a Stripe instance', async () => {
+  it('exports a Stripe instance configured with the correct key and API version', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_dummy'
     const { stripe } = await import('@/lib/stripe')
     expect(stripe).toBeDefined()
     expect(stripe).toBeInstanceOf(Stripe)
-    expect(stripe.key).toBe('sk_test_dummy')
-    expect(stripe.options).toEqual(expect.objectContaining({
-      apiVersion: '2025-01-27.acacia',
+    expect((stripe as any).key).toBe('sk_test_dummy')
+    expect((stripe as any).options).toEqual(expect.objectContaining({
+      apiVersion: '2026-03-25.dahlia',
     }))
   })
 })

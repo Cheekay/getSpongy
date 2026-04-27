@@ -116,6 +116,38 @@ describe('submitRequest', () => {
     expect(result.requestId).toBe('req-999')
     expect(result.error).toBeUndefined()
   })
+
+  it('returns error when user has no RSVP', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'live', requests_paused: false, requests_paused_until: null } }))
+      .mockReturnValueOnce(makeQuery({ count: 0 })) // RSVP check → none
+    const result = await submitRequest(validParams)
+    expect(result.error).toBe('You must RSVP before submitting requests')
+  })
+
+  it('returns retryAfterSeconds when rate-limited', async () => {
+    const createdAt = new Date(Date.now() - 2 * 60 * 1000).toISOString() // submitted 2 min ago
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'live', requests_paused: false, requests_paused_until: null } }))
+      .mockReturnValueOnce(makeQuery({ count: 1 })) // RSVP exists
+      .mockReturnValueOnce(makeQuery({ count: 1 })) // recent requests → rate limited
+      .mockReturnValueOnce(makeQuery({ data: { created_at: createdAt } })) // latest request
+    const result = await submitRequest(validParams)
+    expect(result.error).toMatch(/Please wait/)
+    expect(result.retryAfterSeconds).toBeGreaterThan(0)
+    expect(result.retryAfterSeconds).toBeLessThan(600) // less than 10 min
+  })
+
+  it('returns error when the DB insert fails', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'live', requests_paused: false, requests_paused_until: null } }))
+      .mockReturnValueOnce(makeQuery({ count: 1 })) // RSVP exists
+      .mockReturnValueOnce(makeQuery({ count: 0 })) // no rate limit
+      .mockReturnValueOnce(makeQuery({ count: 0 })) // no duplicate
+    mockServiceClient.from.mockReturnValue(makeQuery({ data: null, error: { message: 'insert failed' } }))
+    const result = await submitRequest(validParams)
+    expect(result.error).toBe('insert failed')
+  })
 })
 
 describe('withdrawRequest', () => {

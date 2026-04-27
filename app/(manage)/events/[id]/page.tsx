@@ -102,7 +102,7 @@ export default async function EventDetailPage({
         <div className="flex items-center justify-between">
           <PayoutChip status={payoutStatus} />
           {payoutStatus === 'not_connected' && (
-            <form action={initiateStripeConnect}>
+            <form action={initiateStripeConnect as unknown as (formData: FormData) => Promise<void>}>
               <button type="submit" className="text-secondary text-sm font-label font-semibold">
                 Connect Stripe →
               </button>
@@ -113,7 +113,7 @@ export default async function EventDetailPage({
 
       {/* Tip settings (immutable once live) */}
       {event.rsvp_type === 'paid' && !isLiveOrEnded && (
-        <form action={updateTipSettings.bind(null, event.id)} className="bg-surface-container-low rounded-xl p-4 space-y-3">
+        <form action={updateTipSettings.bind(null, event.id) as unknown as (formData: FormData) => Promise<void>} className="bg-surface-container-low rounded-xl p-4 space-y-3">
           <p className="text-on-surface-variant text-xs uppercase tracking-wider">Tip Settings</p>
           <label className="flex items-center justify-between">
             <span className="text-on-surface text-sm">Allow tips</span>
@@ -147,7 +147,7 @@ export default async function EventDetailPage({
 
       <div className="space-y-3">
         {event.state === 'draft' && (
-          <form action={publishEvent.bind(null, event.id)}>
+          <form action={publishEvent.bind(null, event.id) as unknown as (formData: FormData) => Promise<void>}>
             <button type="submit" className="w-full py-3 rounded-full bg-primary text-on-primary font-label font-semibold">
               Publish Event
             </button>

@@ -47,7 +47,7 @@ export async function updateTier(
     .eq('id', tierId)
     .single()
 
-  const eventData = tier?.event as { organizer_id: string } | null
+  const eventData = tier?.event as unknown as { organizer_id: string } | null
   if (!tier || eventData?.organizer_id !== user.id) return { error: 'Not authorized' }
 
   const update: Record<string, unknown> = {}
@@ -79,7 +79,7 @@ export async function deleteTier(tierId: string): Promise<{ error?: string }> {
     .eq('id', tierId)
     .single()
 
-  const eventData = tier?.event as { organizer_id: string } | null
+  const eventData = tier?.event as unknown as { organizer_id: string } | null
   if (!tier || eventData?.organizer_id !== user.id) return { error: 'Not authorized' }
   if ((tier.sold_count ?? 0) > 0) return { error: 'Cannot delete a tier with sold tickets' }
 
