@@ -73,7 +73,7 @@ export default function EventList({ events }: { events: EventRow[] }) {
 
           <div className="flex items-center gap-3">
             {event.state === 'published' && (
-              <form action={goLive.bind(null, event.id)}>
+              <form action={goLive.bind(null, event.id) as unknown as (formData: FormData) => Promise<void>}>
                 <button type="submit" className="text-tertiary text-sm font-label font-semibold">
                   Go Live →
                 </button>
@@ -84,7 +84,7 @@ export default function EventList({ events }: { events: EventRow[] }) {
                 <Link href={`/events/${event.id}/door`} className="text-secondary text-sm">
                   Manage Door →
                 </Link>
-                <form action={endEvent.bind(null, event.id)}>
+                <form action={endEvent.bind(null, event.id) as unknown as (formData: FormData) => Promise<void>}>
                   <button type="submit" className="text-on-surface-variant text-sm">
                     End Event
                   </button>
