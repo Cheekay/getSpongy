@@ -83,11 +83,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
-    const sub = event.data.object as Stripe.Subscription
+    const sub = event.data.object as Stripe.Subscription & { current_period_end?: number }
     await admin.from('users').update({
       subscription_status: sub.status,
       stripe_subscription_id: sub.id,
-      subscription_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+      subscription_period_end: sub.current_period_end
+        ? new Date(sub.current_period_end * 1000).toISOString()
+        : null,
     }).eq('stripe_customer_id', sub.customer as string)
   }
 
@@ -107,7 +109,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === 'invoice.payment_succeeded') {
-    const inv = event.data.object as Stripe.Invoice
+    const inv = event.data.object as Stripe.Invoice & { subscription?: string }
     if (inv.subscription) {
       await admin.from('users').update({ subscription_status: 'active' })
         .eq('stripe_customer_id', inv.customer as string)

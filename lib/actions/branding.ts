@@ -10,6 +10,14 @@ interface BrandPatch {
   hideWatermark: boolean
 }
 
+export async function saveBrandSettingsFromForm(formData: FormData): Promise<void> {
+  await saveBrandSettings({
+    logoUrl: formData.get('logoUrl') as string | undefined ?? undefined,
+    accentColor: formData.get('accentColor') as string | undefined ?? undefined,
+    hideWatermark: formData.get('hideWatermark') === 'on',
+  })
+}
+
 export async function saveBrandSettings(patch: BrandPatch): Promise<{ error?: string }> {
   await requirePro()
 
