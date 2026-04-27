@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Spongy",
+    "slug": "spongy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "spongy",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0e0e13"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.spongy.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Spongy uses the camera to scan QR codes at events."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0e0e13"
+      },
+      "package": "com.spongy.app",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#a78bfa",
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -42,4 +42,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Mobile
+mobile/.env
+mobile/.env.local
+mobile/node_modules/
+
 .worktrees/
