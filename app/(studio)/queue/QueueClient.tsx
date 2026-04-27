@@ -138,12 +138,14 @@ export default function QueueClient({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSort((s) => s === 'newest' ? 'upvotes' : s === 'upvotes' ? 'tips' : 'newest')}
+            aria-label={`Sort by: ${sort === 'newest' ? 'newest first' : sort === 'upvotes' ? 'top voted' : 'tips first'}`}
             className="px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant text-sm font-label"
           >
             {sort === 'newest' ? '↓ Newest' : sort === 'upvotes' ? '↑ Top Voted' : '💰 Tips First'}
           </button>
           <button
             onClick={handlePause}
+            aria-label={paused ? 'Resume requests' : 'Pause requests'}
             className={`px-3 py-1.5 rounded-full text-sm font-label font-semibold transition-colors ${
               paused ? 'bg-error text-on-error' : 'bg-surface-container-high text-on-surface-variant'
             }`}

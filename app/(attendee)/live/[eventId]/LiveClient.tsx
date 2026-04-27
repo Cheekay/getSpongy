@@ -244,6 +244,7 @@ export default function LiveClient({
                 <button
                   onClick={handleUpvote}
                   disabled={upvoting}
+                  aria-label={voted ? 'Remove upvote' : 'Upvote this request'}
                   className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-label font-semibold transition-colors ${
                     voted
                       ? 'bg-primary text-on-primary'
@@ -255,7 +256,7 @@ export default function LiveClient({
               )}
             </div>
             {myRequest.state === 'pending' && (
-              <button onClick={handleWithdraw} className="text-on-surface-variant text-xs shrink-0">
+              <button onClick={handleWithdraw} aria-label="Cancel request" className="text-on-surface-variant text-xs shrink-0">
                 Cancel
               </button>
             )}
