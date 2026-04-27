@@ -45,6 +45,9 @@ export default function LiveClient({
   const [tipRequestId, setTipRequestId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const resultButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [focusedResultIndex, setFocusedResultIndex] = useState(-1)
 
   // Watch own request state changes via realtime
   useEffect(() => {
@@ -105,6 +108,12 @@ export default function LiveClient({
     const id = setTimeout(() => setToastMessage(null), 2500)
     return () => clearTimeout(id)
   }, [toastMessage])
+
+  // Reset focused index when results change
+  useEffect(() => {
+    setFocusedResultIndex(-1)
+    resultButtonRefs.current = []
+  }, [results])
 
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
@@ -286,11 +295,22 @@ export default function LiveClient({
       {!myRequest && !retryAfter && (
         <div className="flex flex-col gap-4">
           <input
+            ref={searchInputRef}
             type="search"
             aria-label="Search for a song"
+            aria-controls="song-search-results"
+            aria-activedescendant={focusedResultIndex >= 0 ? `song-result-${focusedResultIndex}` : undefined}
             placeholder="Search for a song…"
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && results.length > 0) {
+                e.preventDefault()
+                const next = Math.min(focusedResultIndex + 1, results.length - 1)
+                setFocusedResultIndex(next)
+                resultButtonRefs.current[next]?.focus()
+              }
+            }}
             className="w-full rounded-full bg-surface-container-highest px-4 py-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary"
           />
 
@@ -311,25 +331,50 @@ export default function LiveClient({
 
           {/* Search results */}
           {results.length > 0 && !selected && !searching && (
-            <div className="space-y-2">
-              {results.map((track) => (
-                <button
-                  key={track.id}
-                  onClick={() => { setSelected(track); setResults([]) }}
-                  className="w-full flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5 text-left hover:bg-surface-container focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-secondary"
-                >
-                  {track.albumArtUrl ? (
-                    <img src={track.albumArtUrl} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-md bg-surface-container-high shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-label font-semibold text-on-surface text-sm truncate">{track.title}</p>
-                    <p className="text-on-surface-variant text-xs truncate">{track.artist}</p>
-                  </div>
-                </button>
+            <ul
+              id="song-search-results"
+              role="listbox"
+              aria-label="Search results"
+              className="space-y-2"
+            >
+              {results.map((track, i) => (
+                <li key={track.id} role="option" id={`song-result-${i}`} aria-selected={focusedResultIndex === i}>
+                  <button
+                    ref={(el) => { resultButtonRefs.current[i] = el }}
+                    onClick={() => { setSelected(track); setResults([]); setFocusedResultIndex(-1) }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowDown' && i < results.length - 1) {
+                        e.preventDefault()
+                        const next = i + 1
+                        setFocusedResultIndex(next)
+                        resultButtonRefs.current[next]?.focus()
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault()
+                        if (i === 0) {
+                          setFocusedResultIndex(-1)
+                          searchInputRef.current?.focus()
+                        } else {
+                          const prev = i - 1
+                          setFocusedResultIndex(prev)
+                          resultButtonRefs.current[prev]?.focus()
+                        }
+                      }
+                    }}
+                    className="w-full flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5 text-left focus:outline-none focus:ring-1 focus:ring-secondary hover:bg-surface-container transition-colors"
+                  >
+                    {track.albumArtUrl ? (
+                      <img src={track.albumArtUrl} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-md bg-surface-container-high shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-label font-semibold text-on-surface text-sm truncate">{track.title}</p>
+                      <p className="text-on-surface-variant text-xs truncate">{track.artist}</p>
+                    </div>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
           {/* Selected track + shoutout + submit */}
