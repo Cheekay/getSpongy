@@ -44,6 +44,16 @@ describe('subscribeToRequests', () => {
     unsubscribe()
     expect(mockRemoveChannel).toHaveBeenCalledOnce()
   })
+
+  it('invokes the onUpdate callback with payload.new when a change fires', () => {
+    const onUpdate = vi.fn()
+    subscribeToRequests('event-123', onUpdate)
+    // mockOn.mock.calls[0][2] is the handler passed to .on('postgres_changes', filter, handler)
+    const handler = mockOn.mock.calls[0][2] as (p: { new: unknown }) => void
+    const mockPayload = { id: 'req-1', state: 'accepted', event_id: 'event-123' }
+    handler({ new: mockPayload })
+    expect(onUpdate).toHaveBeenCalledWith(mockPayload)
+  })
 })
 
 describe('subscribeToCheckIns', () => {
@@ -66,5 +76,14 @@ describe('subscribeToCheckIns', () => {
   it('returns an unsubscribe function', () => {
     const unsubscribe = subscribeToCheckIns('event-456', vi.fn())
     expect(typeof unsubscribe).toBe('function')
+  })
+
+  it('invokes the onUpdate callback with payload.new when a change fires', () => {
+    const onUpdate = vi.fn()
+    subscribeToCheckIns('event-456', onUpdate)
+    const handler = mockOn.mock.calls[0][2] as (p: { new: unknown }) => void
+    const mockPayload = { id: 'rsvp-1', status: 'checked_in', event_id: 'event-456' }
+    handler({ new: mockPayload })
+    expect(onUpdate).toHaveBeenCalledWith(mockPayload)
   })
 })
