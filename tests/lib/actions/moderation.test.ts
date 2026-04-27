@@ -82,6 +82,24 @@ describe('moderateRequest', () => {
     const result = await moderateRequest('req-1', 'rejected')
     expect(result.error).toBeUndefined()
   })
+
+  it('played action succeeds when request is accepted', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { id: 'req-1', event_id: 'ev-1', state: 'accepted' } }))
+      .mockReturnValueOnce(makeQuery({ data: { dj_id: 'dj-user', organizer_id: 'org-1' } }))
+    mockServiceClient.from.mockReturnValue(makeQuery({ error: null }))
+    const result = await moderateRequest('req-1', 'played')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('rejected action succeeds on an already-accepted request', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { id: 'req-1', event_id: 'ev-1', state: 'accepted' } }))
+      .mockReturnValueOnce(makeQuery({ data: { dj_id: 'dj-user', organizer_id: 'org-1' } }))
+    mockServiceClient.from.mockReturnValue(makeQuery({ error: null }))
+    const result = await moderateRequest('req-1', 'rejected')
+    expect(result.error).toBeUndefined()
+  })
 })
 
 describe('revertRequest', () => {
@@ -106,6 +124,23 @@ describe('revertRequest', () => {
     mockServiceClient.from.mockReturnValue(makeQuery({ error: null }))
     const result = await revertRequest('req-1')
     expect(result.error).toBeUndefined()
+  })
+
+  it('reverts a rejected request back to pending', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { id: 'req-1', event_id: 'ev-1', state: 'rejected' } }))
+      .mockReturnValueOnce(makeQuery({ data: { dj_id: 'dj-user', organizer_id: 'org-1' } }))
+    mockServiceClient.from.mockReturnValue(makeQuery({ error: null }))
+    const result = await revertRequest('req-1')
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns error when reverting a played request', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { id: 'req-1', event_id: 'ev-1', state: 'played' } }))
+      .mockReturnValueOnce(makeQuery({ data: { dj_id: 'dj-user', organizer_id: 'org-1' } }))
+    const result = await revertRequest('req-1')
+    expect(result.error).toBe('Can only revert accepted or rejected requests')
   })
 })
 
