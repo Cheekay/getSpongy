@@ -80,6 +80,10 @@ export default async function EventCodePage({ params }: Props) {
 
   const tiers = tiersResult.data ?? []
 
+  const allTiersSoldOut = tiers.length > 0 && tiers.every(
+    (t) => t.inventory !== null && t.sold_count >= t.inventory
+  )
+
   return (
     <EventPageClient
       event={event as any}
@@ -90,6 +94,7 @@ export default async function EventCodePage({ params }: Props) {
       atCapacity={atCapacity}
       appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ''}
       tiers={tiers}
+      allTiersSoldOut={allTiersSoldOut}
     />
   )
 }

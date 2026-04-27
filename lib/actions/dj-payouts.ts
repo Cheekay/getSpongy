@@ -53,7 +53,7 @@ export async function requestDjPayout(): Promise<{ error?: string }> {
 
   try {
     await stripe.payouts.create(
-      { currency: 'usd', method: 'instant' },
+      { currency: 'usd', method: 'instant' } as Parameters<typeof stripe.payouts.create>[0],
       { stripeAccount: userData.stripe_connect_account_id }
     )
   } catch (err) {
