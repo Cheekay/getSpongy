@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, Be_Vietnam_Pro } from 'next/font/google'
 import '../styles/globals.css'
+import { NativeTokenSync } from '@/components/NativeTokenSync'
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${spaceGrotesk.variable} ${beVietnamPro.variable} bg-background text-on-surface font-body antialiased overflow-x-hidden selection:bg-primary selection:text-on-primary-fixed`}
       >
+        <NativeTokenSync />
         {children}
       </body>
     </html>
