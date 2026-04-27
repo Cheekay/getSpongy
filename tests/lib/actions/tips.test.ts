@@ -85,4 +85,37 @@ describe('submitTip', () => {
     const result = await submitTip({ requestId: 'req-1', amountCents: 200 })
     expect(result.clientSecret).toBe('pi_tip_secret')
   })
+
+  it('routes tip to DJ Connect account when DJ is onboarded', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'pending', event_id: 'e-1' }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { tips_enabled: true, min_tip_cents: 100, organizer_id: 'org-1', dj_id: 'dj-1' }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { status: 'checked_in' }, error: null }))
+    mockServiceClient.from
+      .mockReturnValueOnce(makeQuery({ data: { stripe_connect_account_id: 'acct_dj1', stripe_connect_onboarded: true }, error: null }))
+    vi.mocked(stripe.paymentIntents.create).mockResolvedValue({ client_secret: 'pi_dj_secret' } as any)
+
+    const result = await submitTip({ requestId: 'req-1', amountCents: 200 })
+    expect(result.clientSecret).toBe('pi_dj_secret')
+    expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
+      expect.objectContaining({ transfer_data: { destination: 'acct_dj1' } })
+    )
+  })
+
+  it('falls back to organizer Connect account when DJ is not onboarded', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'pending', event_id: 'e-1' }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { tips_enabled: true, min_tip_cents: 100, organizer_id: 'org-1', dj_id: 'dj-1' }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { status: 'checked_in' }, error: null }))
+    mockServiceClient.from
+      .mockReturnValueOnce(makeQuery({ data: { stripe_connect_account_id: 'acct_dj1', stripe_connect_onboarded: false }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { stripe_connect_account_id: 'acct_org' }, error: null }))
+    vi.mocked(stripe.paymentIntents.create).mockResolvedValue({ client_secret: 'pi_org_secret' } as any)
+
+    const result = await submitTip({ requestId: 'req-1', amountCents: 200 })
+    expect(result.clientSecret).toBe('pi_org_secret')
+    expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
+      expect.objectContaining({ transfer_data: { destination: 'acct_org' } })
+    )
+  })
 })

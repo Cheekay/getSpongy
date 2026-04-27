@@ -21,10 +21,12 @@ type EventData = {
 export default function LiveClient({
   event,
   userId,
+  rsvpId,
   initialMyRequest,
 }: {
   event: EventData
   userId: string
+  rsvpId: string
   initialMyRequest: RequestPayload | null
 }) {
   const [myRequest, setMyRequest] = useState<RequestPayload | null>(initialMyRequest)
@@ -334,6 +336,15 @@ export default function LiveClient({
           onClose={() => setTipRequestId(null)}
         />
       )}
+
+      <div className="px-4 pb-4">
+        <a
+          href={`/tickets/${rsvpId}/transfer`}
+          className="block text-center text-on-surface-variant text-xs underline"
+        >
+          Transfer my ticket →
+        </a>
+      </div>
     </main>
   )
 }

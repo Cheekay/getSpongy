@@ -26,7 +26,7 @@ export async function submitTip(params: {
 
   const { data: event } = await supabase
     .from('events')
-    .select('tips_enabled, min_tip_cents, organizer_id')
+    .select('tips_enabled, min_tip_cents, organizer_id, dj_id')
     .eq('id', request.event_id)
     .single()
 
@@ -45,13 +45,29 @@ export async function submitTip(params: {
   if (rsvp?.status !== 'checked_in') return { error: 'Must be checked in to tip' }
 
   const admin = createServiceClient()
-  const { data: organizer } = await admin
-    .from('users')
-    .select('stripe_connect_account_id')
-    .eq('id', event.organizer_id)
-    .single()
+  let destinationAccountId: string | null = null
 
-  if (!organizer?.stripe_connect_account_id) return { error: 'Organizer Stripe not connected' }
+  if (event.dj_id) {
+    const { data: dj } = await admin
+      .from('users')
+      .select('stripe_connect_account_id, stripe_connect_onboarded')
+      .eq('id', event.dj_id)
+      .single()
+    if (dj?.stripe_connect_onboarded && dj.stripe_connect_account_id) {
+      destinationAccountId = dj.stripe_connect_account_id
+    }
+  }
+
+  if (!destinationAccountId) {
+    const { data: organizer } = await admin
+      .from('users')
+      .select('stripe_connect_account_id')
+      .eq('id', event.organizer_id)
+      .single()
+    destinationAccountId = organizer?.stripe_connect_account_id ?? null
+  }
+
+  if (!destinationAccountId) return { error: 'Organizer Stripe not connected' }
 
   const applicationFee = Math.floor(amountCents * 0.03) + 99
 
@@ -61,7 +77,7 @@ export async function submitTip(params: {
       amount: amountCents,
       currency: 'usd',
       application_fee_amount: applicationFee,
-      transfer_data: { destination: organizer.stripe_connect_account_id },
+      transfer_data: { destination: destinationAccountId },
       metadata: {
         type: 'tip',
         request_id: requestId,

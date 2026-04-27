@@ -37,10 +37,11 @@ type EventPageClientProps = {
   atCapacity: boolean
   appUrl: string
   tiers: Tier[]
+  allTiersSoldOut: boolean
 }
 
 export default function EventPageClient({
-  event, user, hasProfile, existingRsvp, rsvpCount, atCapacity, appUrl, tiers,
+  event, user, hasProfile, existingRsvp, rsvpCount, atCapacity, appUrl, tiers, allTiersSoldOut,
 }: EventPageClientProps) {
   const router = useRouter()
   const [rsvp, setRsvp] = useState(existingRsvp)
@@ -129,6 +130,21 @@ export default function EventPageClient({
       </div>
 
       {error && <p className="mx-4 mt-2 text-error text-sm">{error}</p>}
+
+      {event.rsvp_type === 'paid' && allTiersSoldOut && (
+        <div className="px-4 py-4 space-y-3">
+          <div className="bg-surface-container rounded-xl p-4 text-center space-y-3">
+            <p className="font-headline text-lg font-bold">Sold Out</p>
+            <p className="text-on-surface-variant text-sm">All ticket tiers are sold out.</p>
+            <a
+              href={`/e/${event.event_code}/waitlist`}
+              className="block w-full py-3 rounded-full border border-primary text-primary font-label font-semibold text-sm"
+            >
+              Join Waitlist
+            </a>
+          </div>
+        </div>
+      )}
 
       {event.rsvp_type === 'paid' ? (
         <div className="px-4 py-4 space-y-4">

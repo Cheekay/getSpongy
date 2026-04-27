@@ -62,6 +62,7 @@ export default async function LiveEventPage({
     <LiveClient
       event={event}
       userId={user.id}
+      rsvpId={rsvpResult.data!.id}
       initialMyRequest={myRequestResult.data ?? null}
     />
   )
