@@ -36,6 +36,7 @@ export default function LiveClient({
   const [paused, setPaused] = useState(event.requests_paused)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SpotifyTrack[]>([])
+  const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<SpotifyTrack | null>(null)
   const [shoutout, setShoutout] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -109,7 +110,8 @@ export default function LiveClient({
     setQuery(q)
     setSelected(null)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (!q.trim() || q.length < 2) { setResults([]); return }
+    if (!q.trim() || q.length < 2) { setResults([]); setSearching(false); return }
+    setSearching(true)
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/spotify/search?q=${encodeURIComponent(q)}`)
@@ -118,6 +120,8 @@ export default function LiveClient({
         setResults(data.tracks ?? [])
       } catch {
         setResults([])
+      } finally {
+        setSearching(false)
       }
     }, 300)
   }, [])
@@ -289,14 +293,29 @@ export default function LiveClient({
             className="w-full rounded-full bg-surface-container-highest px-4 py-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary"
           />
 
+          {/* Search results skeleton */}
+          {searching && !selected && (
+            <div className="space-y-2" aria-label="Searching…">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5">
+                  <div className="w-10 h-10 rounded-md bg-surface-container-high animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 bg-surface-container-high animate-pulse rounded-full w-3/4" />
+                    <div className="h-2.5 bg-surface-container-high animate-pulse rounded-full w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Search results */}
-          {results.length > 0 && !selected && (
+          {results.length > 0 && !selected && !searching && (
             <div className="space-y-2">
               {results.map((track) => (
                 <button
                   key={track.id}
                   onClick={() => { setSelected(track); setResults([]) }}
-                  className="w-full flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5 text-left"
+                  className="w-full flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5 text-left hover:bg-surface-container focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-secondary"
                 >
                   {track.albumArtUrl ? (
                     <img src={track.albumArtUrl} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
