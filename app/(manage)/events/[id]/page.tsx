@@ -67,6 +67,12 @@ export default async function EventDetailPage({
     djName = djUser?.name ?? null
   }
 
+  const { count: pendingRefundCount } = await supabase
+    .from('refund_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('rsvp.event_id', id)
+    .eq('status', 'pending')
+
   const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/e/${event.event_code}`
   const storyUrl = `/api/story?eventId=${event.id}`
   const isLiveOrEnded = ['live', 'ended'].includes(event.state)
@@ -160,6 +166,18 @@ export default async function EventDetailPage({
         {(event.state === 'live' || event.state === 'ended') && (
           <Link href="/queue">
             <Button variant="secondary" className="w-full">Open DJ Dashboard →</Button>
+          </Link>
+        )}
+        {(event.state === 'published' || event.state === 'live' || event.state === 'ended') && (
+          <Link href={`/manage/events/${event.id}/refunds`}>
+            <Button variant="secondary" className="w-full relative">
+              Refund Requests
+              {(pendingRefundCount ?? 0) > 0 && (
+                <span className="absolute top-1 right-3 bg-error text-on-error text-xs font-bold rounded-full px-1.5 py-0.5">
+                  {pendingRefundCount}
+                </span>
+              )}
+            </Button>
           </Link>
         )}
         {event.state === 'ended' && (
