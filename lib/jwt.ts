@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify, type KeyLike } from 'jose'
+import { SignJWT, jwtVerify } from 'jose'
 
 const TOKEN_EXPIRY = '24h'
 const NEAR_EXPIRY_THRESHOLD_SECONDS = 3600
@@ -9,12 +9,12 @@ export interface QrPayload {
   userId: string
 }
 
-function getSecret(): KeyLike {
-  return new TextEncoder().encode(process.env.QR_JWT_SECRET!) as unknown as KeyLike
+function getSecret(): Uint8Array {
+  return new TextEncoder().encode(process.env.QR_JWT_SECRET!)
 }
 
 export async function signQrJwt(payload: QrPayload): Promise<string> {
-  return new SignJWT(payload as Record<string, unknown>)
+  return new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime(TOKEN_EXPIRY)
     .setIssuedAt()
