@@ -14,6 +14,7 @@ import {
 } from '@/lib/offline'
 import type { GuestRow } from '@/lib/actions/checkin'
 import Link from 'next/link'
+import { Spinner } from '@/components/ui/Spinner'
 
 const QrScannerWidget = dynamic(
   () => import('./QrScannerWidget').then((m) => m.QrScannerWidget),
@@ -37,6 +38,7 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
   const [toast, setToast] = useState<Toast | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const scanLockRef = useRef(false)
+  const [scanning, setScanning] = useState(false)
 
   // Cache guest list on mount and track online status
   useEffect(() => {
@@ -137,41 +139,46 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
   const handleQrScan = useCallback(async (text: string) => {
     if (scanLockRef.current) return
     scanLockRef.current = true
+    setScanning(true)
     setTimeout(() => { scanLockRef.current = false }, 1500)
 
-    if (!isOnline) {
-      // Offline: decode JWT payload without verification, look up rsvpId in cache
-      try {
-        const parts = text.split('.')
-        if (parts.length < 2) throw new Error('bad format')
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-        const rsvpId = payload.rsvpId as string
-        const cached = getCachedGuestList(eventId)
-        const guest = cached?.find((g) => g.id === rsvpId)
-        if (!guest) { showToast('QR not recognised', 'error'); return }
-        if (guest.status === 'checked_in') { showToast('Already checked in', 'warn'); return }
-        applyCheckIn(rsvpId)
-        queueCheckIn(eventId, rsvpId)
-        showToast('Checked in (offline)', 'ok')
-      } catch {
-        showToast('Invalid QR code', 'error')
+    try {
+      if (!isOnline) {
+        // Offline: decode JWT payload without verification, look up rsvpId in cache
+        try {
+          const parts = text.split('.')
+          if (parts.length < 2) throw new Error('bad format')
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+          const rsvpId = payload.rsvpId as string
+          const cached = getCachedGuestList(eventId)
+          const guest = cached?.find((g) => g.id === rsvpId)
+          if (!guest) { showToast('QR not recognised', 'error'); return }
+          if (guest.status === 'checked_in') { showToast('Already checked in', 'warn'); return }
+          applyCheckIn(rsvpId)
+          queueCheckIn(eventId, rsvpId)
+          showToast('Checked in (offline)', 'ok')
+        } catch {
+          showToast('Invalid QR code', 'error')
+        }
+        return
       }
-      return
-    }
 
-    const result = await verifyAndCheckIn(text)
-    if (result.error) {
-      showToast(result.error, 'error')
-    } else if (result.duplicate) {
-      showToast('Already checked in', 'warn')
-    } else {
-      // Find the rsvpId from the JWT payload to update local state
-      try {
-        const parts = text.split('.')
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-        applyCheckIn(payload.rsvpId)
-      } catch { /* local state will sync on next page load */ }
-      showToast('Checked in ✓', 'ok')
+      const result = await verifyAndCheckIn(text)
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else if (result.duplicate) {
+        showToast('Already checked in', 'warn')
+      } else {
+        // Find the rsvpId from the JWT payload to update local state
+        try {
+          const parts = text.split('.')
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+          applyCheckIn(payload.rsvpId)
+        } catch { /* local state will sync on next page load */ }
+        showToast('Checked in ✓', 'ok')
+      }
+    } finally {
+      setScanning(false)
     }
   }, [eventId, isOnline, applyCheckIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -260,8 +267,13 @@ export default function DoorClient({ eventId, eventTitle, capacity, initialGuest
       )}
 
       {tab === 'scan' && (
-        <div className="flex-1 px-4">
+        <div className="flex-1 px-4 relative">
           <QrScannerWidget onScan={handleQrScan} />
+          {scanning && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+              <Spinner size={36} />
+            </div>
+          )}
         </div>
       )}
 
