@@ -14,6 +14,11 @@ vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: vi.fn(() => mockServiceClient),
 }))
 
+const mockSendPush = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/notifications', () => ({
+  sendPushNotification: mockSendPush,
+}))
+
 function makeQuery(result: unknown, extra: Record<string, unknown> = {}) {
   const q: Record<string, unknown> = {
     select: vi.fn().mockReturnThis(),
@@ -32,7 +37,7 @@ function makeQuery(result: unknown, extra: Record<string, unknown> = {}) {
   return q
 }
 
-import { joinWaitlist, leaveWaitlist } from '@/lib/actions/waitlist'
+import { joinWaitlist, leaveWaitlist, notifyWaitlist } from '@/lib/actions/waitlist'
 
 describe('joinWaitlist', () => {
   beforeEach(() => {
@@ -99,5 +104,64 @@ describe('leaveWaitlist', () => {
     const result = await leaveWaitlist('event-1')
     expect(result.error).toBeUndefined()
     expect(deleteQuery.delete).toHaveBeenCalled()
+  })
+})
+
+describe('notifyWaitlist', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSendPush.mockResolvedValue(undefined)
+  })
+
+  it('sends a push notification to the first un-notified waitlist entry', async () => {
+    const waitlistQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: { id: 'wl-1', user_id: 'u-1', position: 1 },
+        error: null,
+      }),
+    }
+    const updateQuery = {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }
+    const eventQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { title: 'Friday Night' }, error: null }),
+    }
+
+    mockServiceClient.from
+      .mockReturnValueOnce(waitlistQuery)
+      .mockReturnValueOnce(updateQuery)
+      .mockReturnValueOnce(eventQuery)
+
+    await notifyWaitlist('event-1')
+
+    expect(mockSendPush).toHaveBeenCalledWith(
+      'u-1',
+      'Spot available!',
+      expect.stringContaining('Friday Night'),
+      expect.objectContaining({ eventId: 'event-1', type: 'waitlist' })
+    )
+  })
+
+  it('does not send push when no un-notified entries exist', async () => {
+    const emptyQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    }
+    mockServiceClient.from.mockReturnValue(emptyQuery)
+
+    await notifyWaitlist('event-1')
+    expect(mockSendPush).not.toHaveBeenCalled()
   })
 })

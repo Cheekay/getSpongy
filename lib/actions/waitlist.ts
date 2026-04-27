@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { sendPushNotification } from '@/lib/notifications'
 
 export async function joinWaitlist(params: {
   eventId: string
@@ -75,4 +76,17 @@ export async function notifyWaitlist(eventId: string, tierId?: string): Promise<
   if (!entry) return
 
   await admin.from('waitlist').update({ notified_at: new Date().toISOString() }).eq('id', entry.id)
+
+  const { data: event } = await admin
+    .from('events')
+    .select('title')
+    .eq('id', eventId)
+    .single()
+
+  await sendPushNotification(
+    entry.user_id,
+    'Spot available!',
+    `A spot just opened up${event?.title ? ` for "${event.title}"` : ''}. Claim it before it's gone.`,
+    { eventId, type: 'waitlist' }
+  )
 }
