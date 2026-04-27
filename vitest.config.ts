@@ -9,7 +9,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     globals: true,
     passWithNoTests: true,
-    exclude: ['node_modules', '.worktrees/**'],
+    exclude: ['node_modules', '.worktrees/**', 'mobile/**'],
   },
   resolve: {
     alias: {
