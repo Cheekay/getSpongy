@@ -24,13 +24,20 @@ export async function sendPushNotification(
     sound: 'default' as const,
   }))
 
-  await fetch(EXPO_PUSH_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'Accept-Encoding': 'gzip, deflate',
-    },
-    body: JSON.stringify(messages),
-  })
+  try {
+    const res = await fetch(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+      },
+      body: JSON.stringify(messages),
+    })
+    if (!res.ok) {
+      console.error('[notifications] Expo push failed:', res.status, await res.text())
+    }
+  } catch (err) {
+    console.error('[notifications] Expo push error:', err)
+  }
 }
