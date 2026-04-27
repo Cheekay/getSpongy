@@ -42,12 +42,24 @@ export default function LiveClient({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const [tipRequestId, setTipRequestId] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // Watch own request state changes via realtime
   useEffect(() => {
+    const TERMINAL: RequestPayload['state'][] = ['rejected', 'played', 'expired', 'withdrawn']
     const unsub = subscribeToRequests(event.id, (payload) => {
-      if (payload.user_id === userId) {
+      if (payload.user_id !== userId) return
+      if (TERMINAL.includes(payload.state)) {
+        const msg =
+          payload.state === 'played' ? '🎵 Your song was played!'
+          : payload.state === 'rejected' ? '✕ Your request was passed on'
+          : 'Your request is no longer active'
+        setToastMessage(msg)
+        setMyRequest(null)
+        setUpvoteCount(0)
+        setVoted(false)
+      } else {
         setMyRequest(payload)
         setUpvoteCount(payload.upvote_count)
       }
@@ -85,6 +97,13 @@ export default function LiveClient({
     const id = setInterval(() => setRetryAfter((s) => (s && s > 1 ? s - 1 : null)), 1000)
     return () => clearInterval(id)
   }, [retryAfter])
+
+  // Auto-dismiss toast after 2.5 seconds
+  useEffect(() => {
+    if (!toastMessage) return
+    const id = setTimeout(() => setToastMessage(null), 2500)
+    return () => clearTimeout(id)
+  }, [toastMessage])
 
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q)
@@ -194,6 +213,15 @@ export default function LiveClient({
         <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" />
         <span className="font-label text-xs text-tertiary uppercase tracking-wider">{event.title}</span>
       </div>
+
+      {toastMessage && (
+        <div
+          aria-live="polite"
+          className="rounded-xl px-4 py-3 bg-surface-container-high text-on-surface text-sm font-label text-center"
+        >
+          {toastMessage}
+        </div>
+      )}
 
       {/* My active request */}
       {isRequestActive && myRequest && (
