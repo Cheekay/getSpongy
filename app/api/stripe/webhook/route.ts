@@ -82,6 +82,38 @@ export async function POST(request: NextRequest) {
       .eq('stripe_connect_account_id', account.id)
   }
 
+  if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+    const sub = event.data.object as Stripe.Subscription
+    await admin.from('users').update({
+      subscription_status: sub.status,
+      stripe_subscription_id: sub.id,
+      subscription_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+    }).eq('stripe_customer_id', sub.customer as string)
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+    const sub = event.data.object as Stripe.Subscription
+    await admin.from('users').update({
+      subscription_status: 'canceled',
+      stripe_subscription_id: null,
+      subscription_period_end: null,
+    }).eq('stripe_customer_id', sub.customer as string)
+  }
+
+  if (event.type === 'invoice.payment_failed') {
+    const inv = event.data.object as Stripe.Invoice
+    await admin.from('users').update({ subscription_status: 'past_due' })
+      .eq('stripe_customer_id', inv.customer as string)
+  }
+
+  if (event.type === 'invoice.payment_succeeded') {
+    const inv = event.data.object as Stripe.Invoice
+    if (inv.subscription) {
+      await admin.from('users').update({ subscription_status: 'active' })
+        .eq('stripe_customer_id', inv.customer as string)
+    }
+  }
+
   return new NextResponse('OK', { status: 200 })
 }
 

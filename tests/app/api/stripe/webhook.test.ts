@@ -102,4 +102,93 @@ describe('POST /api/stripe/webhook', () => {
     const res = await POST(req)
     expect(res.status).toBe(200)
   })
+
+  it('sets subscription_status to trialing on customer.subscription.created with trial', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'customer.subscription.created',
+      data: {
+        object: {
+          id: 'sub_123',
+          customer: 'cus_123',
+          status: 'trialing',
+          current_period_end: now + 86400 * 14,
+        },
+      },
+    } as any)
+    const updateQuery = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) }
+    mockServiceClient.from.mockReturnValue(updateQuery)
+
+    const req = makeRequest('{}', 'valid-sig')
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(updateQuery.update).toHaveBeenCalledWith(expect.objectContaining({
+      subscription_status: 'trialing',
+      stripe_subscription_id: 'sub_123',
+    }))
+  })
+
+  it('sets subscription_status to active on customer.subscription.updated', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_123',
+          customer: 'cus_123',
+          status: 'active',
+          current_period_end: now + 86400 * 30,
+        },
+      },
+    } as any)
+    const updateQuery = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) }
+    mockServiceClient.from.mockReturnValue(updateQuery)
+
+    const req = makeRequest('{}', 'valid-sig')
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(updateQuery.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'active' }))
+  })
+
+  it('sets subscription_status to canceled on customer.subscription.deleted', async () => {
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'customer.subscription.deleted',
+      data: { object: { id: 'sub_123', customer: 'cus_123' } },
+    } as any)
+    const updateQuery = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) }
+    mockServiceClient.from.mockReturnValue(updateQuery)
+
+    const req = makeRequest('{}', 'valid-sig')
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(updateQuery.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'canceled' }))
+  })
+
+  it('sets subscription_status to past_due on invoice.payment_failed', async () => {
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'invoice.payment_failed',
+      data: { object: { customer: 'cus_123' } },
+    } as any)
+    const updateQuery = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) }
+    mockServiceClient.from.mockReturnValue(updateQuery)
+
+    const req = makeRequest('{}', 'valid-sig')
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(updateQuery.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'past_due' }))
+  })
+
+  it('sets subscription_status to active on invoice.payment_succeeded', async () => {
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'invoice.payment_succeeded',
+      data: { object: { customer: 'cus_123', subscription: 'sub_123' } },
+    } as any)
+    const updateQuery = { update: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) }
+    mockServiceClient.from.mockReturnValue(updateQuery)
+
+    const req = makeRequest('{}', 'valid-sig')
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(updateQuery.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'active' }))
+  })
 })
