@@ -12,7 +12,7 @@ export default async function LiveEventPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/login?redirect=/live/${eventId}`)
 
-  const [eventResult, rsvpResult, myRequestResult] = await Promise.all([
+  const [eventResult, rsvpResult, myRequestResult, queueResult] = await Promise.all([
     supabase
       .from('events')
       .select('id, title, state, event_code, requests_paused, requests_paused_until, tips_enabled, min_tip_cents')
@@ -34,7 +34,27 @@ export default async function LiveEventPage({
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('song_requests')
+      .select('*')
+      .eq('event_id', eventId)
+      .eq('state', 'accepted')
+      .order('upvote_count', { ascending: false })
+      .order('state_changed_at', { ascending: true }),
   ])
+
+  const initialQueue = queueResult.data ?? []
+
+  const queueIds = initialQueue.map((r: { id: string }) => r.id)
+  const upvotedResult = queueIds.length > 0
+    ? await supabase
+        .from('upvotes')
+        .select('request_id')
+        .eq('user_id', user.id)
+        .in('request_id', queueIds)
+    : { data: [] as { request_id: string }[] }
+
+  const initialUpvotedIds = (upvotedResult.data ?? []).map((u: { request_id: string }) => u.request_id)
 
   const event = eventResult.data
   if (!event) {
@@ -64,6 +84,8 @@ export default async function LiveEventPage({
       userId={user.id}
       rsvpId={rsvpResult.data!.id}
       initialMyRequest={myRequestResult.data ?? null}
+      initialQueue={initialQueue}
+      initialUpvotedIds={initialUpvotedIds}
     />
   )
 }
