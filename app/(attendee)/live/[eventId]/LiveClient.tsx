@@ -8,6 +8,7 @@ import { toggleUpvote } from '@/lib/actions/upvotes'
 import type { SpotifyTrack } from '@/lib/spotify'
 import dynamic from 'next/dynamic'
 const TipModal = dynamic(() => import('./TipModal'), { ssr: false })
+const QueueTab = dynamic(() => import('./QueueTab'), { ssr: false })
 
 type EventData = {
   id: string
@@ -23,11 +24,15 @@ export default function LiveClient({
   userId,
   rsvpId,
   initialMyRequest,
+  initialQueue,
+  initialUpvotedIds,
 }: {
   event: EventData
   userId: string
   rsvpId: string
   initialMyRequest: RequestPayload | null
+  initialQueue: RequestPayload[]
+  initialUpvotedIds: string[]
 }) {
   const [myRequest, setMyRequest] = useState<RequestPayload | null>(initialMyRequest)
   const [upvoteCount, setUpvoteCount] = useState(initialMyRequest?.upvote_count ?? 0)
@@ -44,28 +49,47 @@ export default function LiveClient({
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const [tipRequestId, setTipRequestId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'my-request' | 'queue'>('my-request')
+  const [acceptedQueue, setAcceptedQueue] = useState<RequestPayload[]>(initialQueue)
+  const [upvotedIds, setUpvotedIds] = useState<Set<string>>(new Set(initialUpvotedIds))
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const resultButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [focusedResultIndex, setFocusedResultIndex] = useState(-1)
 
-  // Watch own request state changes via realtime
+  // Watch own request + queue state changes via realtime
   useEffect(() => {
     const TERMINAL: RequestPayload['state'][] = ['rejected', 'played', 'expired', 'withdrawn']
     const unsub = subscribeToRequests(event.id, (payload) => {
-      if (payload.user_id !== userId) return
-      if (TERMINAL.includes(payload.state)) {
-        const msg =
-          payload.state === 'played' ? '🎵 Your song was played!'
-          : payload.state === 'rejected' ? '✕ Your request was passed on'
-          : 'Your request is no longer active'
-        setToastMessage(msg)
-        setMyRequest(null)
-        setUpvoteCount(0)
-        setVoted(false)
+      // Own-request branch (unchanged logic)
+      if (payload.user_id === userId) {
+        if (TERMINAL.includes(payload.state)) {
+          const msg =
+            payload.state === 'played' ? '🎵 Your song was played!'
+            : payload.state === 'rejected' ? '✕ Your request was passed on'
+            : 'Your request is no longer active'
+          setToastMessage(msg)
+          setMyRequest(null)
+          setUpvoteCount(0)
+          setVoted(false)
+        } else {
+          setMyRequest(payload)
+          setUpvoteCount(payload.upvote_count)
+        }
+      }
+
+      // Queue branch — not mutually exclusive with own-request branch
+      if (payload.state === 'accepted') {
+        setAcceptedQueue(prev => {
+          const without = prev.filter(r => r.id !== payload.id)
+          return [...without, payload].sort((a, b) =>
+            b.upvote_count !== a.upvote_count
+              ? b.upvote_count - a.upvote_count
+              : new Date(a.state_changed_at).getTime() - new Date(b.state_changed_at).getTime()
+          )
+        })
       } else {
-        setMyRequest(payload)
-        setUpvoteCount(payload.upvote_count)
+        setAcceptedQueue(prev => prev.filter(r => r.id !== payload.id))
       }
     })
     return unsub
@@ -165,6 +189,45 @@ export default function LiveClient({
     setMyRequest(null)
   }
 
+  async function handleQueueUpvote(requestId: string) {
+    const wasVoted = upvotedIds.has(requestId)
+    // Optimistic update
+    setUpvotedIds(prev => {
+      const next = new Set(prev)
+      wasVoted ? next.delete(requestId) : next.add(requestId)
+      return next
+    })
+    setAcceptedQueue(prev =>
+      prev.map(r =>
+        r.id === requestId
+          ? { ...r, upvote_count: Math.max(0, r.upvote_count + (wasVoted ? -1 : 1)) }
+          : r
+      ).sort((a, b) =>
+        b.upvote_count !== a.upvote_count
+          ? b.upvote_count - a.upvote_count
+          : new Date(a.state_changed_at).getTime() - new Date(b.state_changed_at).getTime()
+      )
+    )
+
+    const result = await toggleUpvote(requestId)
+    if (result.error) {
+      // Roll back
+      setUpvotedIds(prev => {
+        const next = new Set(prev)
+        wasVoted ? next.add(requestId) : next.delete(requestId)
+        return next
+      })
+      setAcceptedQueue(prev =>
+        prev.map(r =>
+          r.id === requestId
+            ? { ...r, upvote_count: Math.max(0, r.upvote_count + (wasVoted ? 1 : -1)) }
+            : r
+        )
+      )
+      setToastMessage(result.error)
+    }
+  }
+
   async function handleUpvote() {
     if (!myRequest || myRequest.state !== 'pending' || upvoting) return
     const prev = { voted, count: upvoteCount }
@@ -236,189 +299,222 @@ export default function LiveClient({
         </div>
       )}
 
-      {/* My active request */}
-      {isRequestActive && myRequest && (
+      {/* Tab switcher */}
+      <div className="flex gap-1.5 bg-surface-container-high rounded-full p-1">
+        <button
+          onClick={() => setActiveTab('my-request')}
+          className={`flex-1 rounded-full px-3 py-1.5 text-xs font-label font-semibold transition-colors ${
+            activeTab === 'my-request' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
+          }`}
+        >
+          My Request
+        </button>
+        <button
+          onClick={() => setActiveTab('queue')}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-label font-semibold transition-colors ${
+            activeTab === 'queue' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
+          }`}
+        >
+          Queue
+          {acceptedQueue.length > 0 && (
+            <span className={`rounded-full px-1.5 text-[10px] ${
+              activeTab === 'queue'
+                ? 'bg-on-primary/20 text-on-primary'
+                : 'bg-surface-container-highest text-on-surface-variant'
+            }`}>
+              {acceptedQueue.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'my-request' && (
         <>
-          <div className={`rounded-2xl p-4 flex gap-3 items-start ${statusCardClass}`}>
-            {myRequest.album_art_url && (
-              <img src={myRequest.album_art_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="font-label font-semibold text-on-surface truncate">{myRequest.track_title}</p>
-              <p className="text-on-surface-variant text-sm truncate">{myRequest.track_artist}</p>
-              <p className={`text-xs mt-1 font-label font-semibold ${statusLabelClass}`}>
-                {statusLabel}
-              </p>
-              {myRequest.state === 'pending' && (
-                <button
-                  onClick={handleUpvote}
-                  disabled={upvoting}
-                  aria-label={voted ? 'Remove upvote' : 'Upvote this request'}
-                  className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-label font-semibold transition-colors ${
-                    voted
-                      ? 'bg-primary text-on-primary'
-                      : 'bg-surface-container-highest text-on-surface-variant'
-                  }`}
-                >
-                  ↑ {upvoteCount} {voted ? 'Upvoted' : 'Upvote'}
-                </button>
-              )}
-            </div>
-            {myRequest.state === 'pending' && (
-              <button onClick={handleWithdraw} aria-label="Cancel request" className="text-on-surface-variant text-xs shrink-0">
-                Cancel
-              </button>
-            )}
-          </div>
-          {myRequest.state === 'pending' && event.tips_enabled && (
-            <button
-              onClick={() => setTipRequestId(myRequest.id)}
-              className="mt-2 px-4 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant text-xs font-label font-semibold"
-            >
-              💰 Tip to boost
-            </button>
-          )}
-        </>
-      )}
-
-      {/* Rate limit countdown */}
-      {retryAfter && !myRequest && (
-        <div className="text-center text-on-surface-variant text-sm">
-          Next request in{' '}
-          <span className="font-label font-semibold text-on-surface">
-            {Math.floor(retryAfter / 60)}:{String(retryAfter % 60).padStart(2, '0')}
-          </span>
-        </div>
-      )}
-
-      {/* Search + submit (hidden when user has active request or rate-limited) */}
-      {!myRequest && !retryAfter && (
-        <div className="flex flex-col gap-4">
-          <input
-            ref={searchInputRef}
-            type="search"
-            aria-label="Search for a song"
-            aria-controls="song-search-results"
-            aria-activedescendant={focusedResultIndex >= 0 ? `song-result-${focusedResultIndex}` : undefined}
-            placeholder="Search for a song…"
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowDown' && results.length > 0) {
-                e.preventDefault()
-                const next = Math.min(focusedResultIndex + 1, results.length - 1)
-                setFocusedResultIndex(next)
-                resultButtonRefs.current[next]?.focus()
-              }
-            }}
-            className="w-full rounded-full bg-surface-container-highest px-4 py-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary"
-          />
-
-          {/* Search results skeleton */}
-          {searching && !selected && (
-            <div className="space-y-2" aria-label="Searching…">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5">
-                  <div className="w-10 h-10 rounded-md bg-surface-container-high animate-pulse shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 bg-surface-container-high animate-pulse rounded-full w-3/4" />
-                    <div className="h-2.5 bg-surface-container-high animate-pulse rounded-full w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Search results */}
-          {results.length > 0 && !selected && !searching && (
-            <ul
-              id="song-search-results"
-              role="listbox"
-              aria-label="Search results"
-              className="space-y-2"
-            >
-              {results.map((track, i) => (
-                <li key={track.id} role="option" id={`song-result-${i}`} aria-selected={focusedResultIndex === i}>
-                  <button
-                    ref={(el) => { resultButtonRefs.current[i] = el }}
-                    onClick={() => { setSelected(track); setResults([]); setFocusedResultIndex(-1) }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'ArrowDown' && i < results.length - 1) {
-                        e.preventDefault()
-                        const next = i + 1
-                        setFocusedResultIndex(next)
-                        resultButtonRefs.current[next]?.focus()
-                      } else if (e.key === 'ArrowUp') {
-                        e.preventDefault()
-                        if (i === 0) {
-                          setFocusedResultIndex(-1)
-                          searchInputRef.current?.focus()
-                        } else {
-                          const prev = i - 1
-                          setFocusedResultIndex(prev)
-                          resultButtonRefs.current[prev]?.focus()
-                        }
-                      }
-                    }}
-                    className="w-full flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5 text-left focus:outline-none focus:ring-1 focus:ring-secondary hover:bg-surface-container transition-colors"
-                  >
-                    {track.albumArtUrl ? (
-                      <img src={track.albumArtUrl} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-md bg-surface-container-high shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-label font-semibold text-on-surface text-sm truncate">{track.title}</p>
-                      <p className="text-on-surface-variant text-xs truncate">{track.artist}</p>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* Selected track + shoutout + submit */}
-          {selected && (
-            <div className="space-y-3">
-              <div className="flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-3">
-                {selected.albumArtUrl ? (
-                  <img src={selected.albumArtUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-surface-container-high shrink-0" />
+          {/* My active request */}
+          {isRequestActive && myRequest && (
+            <>
+              <div className={`rounded-2xl p-4 flex gap-3 items-start ${statusCardClass}`}>
+                {myRequest.album_art_url && (
+                  <img src={myRequest.album_art_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-label font-semibold text-on-surface truncate">{selected.title}</p>
-                  <p className="text-on-surface-variant text-sm truncate">{selected.artist}</p>
+                  <p className="font-label font-semibold text-on-surface truncate">{myRequest.track_title}</p>
+                  <p className="text-on-surface-variant text-sm truncate">{myRequest.track_artist}</p>
+                  <p className={`text-xs mt-1 font-label font-semibold ${statusLabelClass}`}>
+                    {statusLabel}
+                  </p>
+                  {myRequest.state === 'pending' && (
+                    <button
+                      onClick={handleUpvote}
+                      disabled={upvoting}
+                      aria-label={voted ? 'Remove upvote' : 'Upvote this request'}
+                      className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-label font-semibold transition-colors ${
+                        voted
+                          ? 'bg-primary text-on-primary'
+                          : 'bg-surface-container-highest text-on-surface-variant'
+                      }`}
+                    >
+                      ↑ {upvoteCount} {voted ? 'Upvoted' : 'Upvote'}
+                    </button>
+                  )}
                 </div>
-                <button onClick={() => setSelected(null)} aria-label="Remove selected track" className="text-on-surface-variant px-2 shrink-0">
-                  ✕
-                </button>
+                {myRequest.state === 'pending' && (
+                  <button onClick={handleWithdraw} aria-label="Cancel request" className="text-on-surface-variant text-xs shrink-0">
+                    Cancel
+                  </button>
+                )}
               </div>
-
-              <textarea
-                placeholder="Add a shoutout (optional)"
-                maxLength={140}
-                value={shoutout}
-                onChange={(e) => setShoutout(e.target.value)}
-                rows={2}
-                className="w-full bg-surface-container-highest rounded-xl px-4 py-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary resize-none text-sm"
-              />
-              <p className="text-right text-xs text-on-surface-variant">{shoutout.length}/140</p>
-
-              {submitError && (
-                <p className="text-error text-sm text-center">{submitError}</p>
+              {myRequest.state === 'pending' && event.tips_enabled && (
+                <button
+                  onClick={() => setTipRequestId(myRequest.id)}
+                  className="mt-2 px-4 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant text-xs font-label font-semibold"
+                >
+                  💰 Tip to boost
+                </button>
               )}
+            </>
+          )}
 
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="w-full py-3.5 rounded-full bg-primary text-on-primary font-label font-semibold text-base disabled:opacity-50"
-              >
-                {submitting ? 'Sending…' : 'Request Song'}
-              </button>
+          {/* Rate limit countdown */}
+          {retryAfter && !myRequest && (
+            <div className="text-center text-on-surface-variant text-sm">
+              Next request in{' '}
+              <span className="font-label font-semibold text-on-surface">
+                {Math.floor(retryAfter / 60)}:{String(retryAfter % 60).padStart(2, '0')}
+              </span>
             </div>
           )}
-        </div>
+
+          {/* Search + submit (hidden when user has active request or rate-limited) */}
+          {!myRequest && !retryAfter && (
+            <div className="flex flex-col gap-4">
+              <input
+                ref={searchInputRef}
+                type="search"
+                aria-label="Search for a song"
+                aria-controls="song-search-results"
+                aria-activedescendant={focusedResultIndex >= 0 ? `song-result-${focusedResultIndex}` : undefined}
+                placeholder="Search for a song…"
+                value={query}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown' && results.length > 0) {
+                    e.preventDefault()
+                    const next = Math.min(focusedResultIndex + 1, results.length - 1)
+                    setFocusedResultIndex(next)
+                    resultButtonRefs.current[next]?.focus()
+                  }
+                }}
+                className="w-full rounded-full bg-surface-container-highest px-4 py-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary"
+              />
+
+              {/* Search results skeleton */}
+              {searching && !selected && (
+                <div className="space-y-2" aria-label="Searching…">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5">
+                      <div className="w-10 h-10 rounded-md bg-surface-container-high animate-pulse shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 bg-surface-container-high animate-pulse rounded-full w-3/4" />
+                        <div className="h-2.5 bg-surface-container-high animate-pulse rounded-full w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Search results */}
+              {results.length > 0 && !selected && !searching && (
+                <ul
+                  id="song-search-results"
+                  role="listbox"
+                  aria-label="Search results"
+                  className="space-y-2"
+                >
+                  {results.map((track, i) => (
+                    <li key={track.id} role="option" id={`song-result-${i}`} aria-selected={focusedResultIndex === i}>
+                      <button
+                        ref={(el) => { resultButtonRefs.current[i] = el }}
+                        onClick={() => { setSelected(track); setResults([]); setFocusedResultIndex(-1) }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowDown' && i < results.length - 1) {
+                            e.preventDefault()
+                            const next = i + 1
+                            setFocusedResultIndex(next)
+                            resultButtonRefs.current[next]?.focus()
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault()
+                            if (i === 0) {
+                              setFocusedResultIndex(-1)
+                              searchInputRef.current?.focus()
+                            } else {
+                              const prev = i - 1
+                              setFocusedResultIndex(prev)
+                              resultButtonRefs.current[prev]?.focus()
+                            }
+                          }
+                        }}
+                        className="w-full flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-2.5 text-left focus:outline-none focus:ring-1 focus:ring-secondary hover:bg-surface-container transition-colors"
+                      >
+                        {track.albumArtUrl ? (
+                          <img src={track.albumArtUrl} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-md bg-surface-container-high shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-label font-semibold text-on-surface text-sm truncate">{track.title}</p>
+                          <p className="text-on-surface-variant text-xs truncate">{track.artist}</p>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Selected track + shoutout + submit */}
+              {selected && (
+                <div className="space-y-3">
+                  <div className="flex gap-3 items-center bg-surface-container-low rounded-xl px-3 py-3">
+                    {selected.albumArtUrl ? (
+                      <img src={selected.albumArtUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-surface-container-high shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-label font-semibold text-on-surface truncate">{selected.title}</p>
+                      <p className="text-on-surface-variant text-sm truncate">{selected.artist}</p>
+                    </div>
+                    <button onClick={() => setSelected(null)} aria-label="Remove selected track" className="text-on-surface-variant px-2 shrink-0">
+                      ✕
+                    </button>
+                  </div>
+
+                  <textarea
+                    placeholder="Add a shoutout (optional)"
+                    maxLength={140}
+                    value={shoutout}
+                    onChange={(e) => setShoutout(e.target.value)}
+                    rows={2}
+                    className="w-full bg-surface-container-highest rounded-xl px-4 py-3 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary resize-none text-sm"
+                  />
+                  <p className="text-right text-xs text-on-surface-variant">{shoutout.length}/140</p>
+
+                  {submitError && (
+                    <p className="text-error text-sm text-center">{submitError}</p>
+                  )}
+
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="w-full py-3.5 rounded-full bg-primary text-on-primary font-label font-semibold text-base disabled:opacity-50"
+                  >
+                    {submitting ? 'Sending…' : 'Request Song'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {tipRequestId && (
@@ -438,6 +534,15 @@ export default function LiveClient({
           Transfer my ticket →
         </a>
       </div>
+
+      {/* Queue tab */}
+      {activeTab === 'queue' && (
+        <QueueTab
+          queue={acceptedQueue}
+          upvotedIds={upvotedIds}
+          onUpvote={handleQueueUpvote}
+        />
+      )}
     </main>
   )
 }
