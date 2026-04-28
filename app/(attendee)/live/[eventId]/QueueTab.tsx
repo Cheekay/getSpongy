@@ -36,7 +36,7 @@ export default function QueueTab({ queue, upvotedIds, onUpvote }: QueueTabProps)
             </div>
             <button
               onClick={() => onUpvote(track.id)}
-              aria-label={voted ? 'Remove upvote' : 'Upvote this song'}
+              aria-label={voted ? `Remove upvote — ${track.upvote_count} upvotes` : `Upvote this song — ${track.upvote_count} upvotes`}
               className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-label font-semibold shrink-0 transition-colors ${
                 voted
                   ? 'bg-primary text-on-primary'
