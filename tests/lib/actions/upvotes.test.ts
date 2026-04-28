@@ -47,11 +47,11 @@ describe('toggleUpvote', () => {
     expect(result.error).toBe('Not authenticated')
   })
 
-  it('returns error when request is not pending', async () => {
+  it('returns error when request is not in an active state', async () => {
     mockSupabaseClient.from
-      .mockReturnValueOnce(makeQuery({ data: { state: 'accepted', event_id: 'e-1', upvote_count: 3 }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { state: 'played', event_id: 'e-1', upvote_count: 3 }, error: null }))
     const result = await toggleUpvote('req-1')
-    expect(result.error).toBe('Can only upvote pending requests')
+    expect(result.error).toBe('Can only upvote active requests')
   })
 
   it('returns error when user is not checked in', async () => {
@@ -84,5 +84,24 @@ describe('toggleUpvote', () => {
     const result = await toggleUpvote('req-1')
     expect(result.voted).toBe(false)
     expect(result.count).toBe(4)
+  })
+
+  it('allows upvoting an accepted request when checked in', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'accepted', event_id: 'e-1', upvote_count: 2 }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: { status: 'checked_in' }, error: null }))
+      .mockReturnValueOnce(makeQuery({ data: null, error: null })) // no existing upvote
+    mockServiceClient.from.mockReturnValueOnce(makeQuery({ error: null })) // insert
+
+    const result = await toggleUpvote('req-accepted')
+    expect(result.voted).toBe(true)
+    expect(result.count).toBe(3)
+  })
+
+  it('returns error when upvoting a played (terminal) request', async () => {
+    mockSupabaseClient.from
+      .mockReturnValueOnce(makeQuery({ data: { state: 'played', event_id: 'e-1', upvote_count: 5 }, error: null }))
+    const result = await toggleUpvote('req-played')
+    expect(result.error).toBe('Can only upvote active requests')
   })
 })

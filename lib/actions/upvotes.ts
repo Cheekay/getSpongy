@@ -17,7 +17,7 @@ export async function toggleUpvote(
     .single()
 
   if (!request) return { error: 'Request not found' }
-  if (request.state !== 'pending') return { error: 'Can only upvote pending requests' }
+  if (!['pending', 'accepted'].includes(request.state)) return { error: 'Can only upvote active requests' }
 
   const { data: rsvp } = await supabase
     .from('rsvps')
