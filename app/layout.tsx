@@ -37,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body
+        suppressHydrationWarning
         className={`${spaceGrotesk.variable} ${beVietnamPro.variable} bg-background text-on-surface font-body antialiased overflow-x-hidden selection:bg-primary selection:text-on-primary-fixed`}
       >
         <a

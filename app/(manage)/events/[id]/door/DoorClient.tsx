@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { checkInGuest, formatCheckinTime, verifyAndCheckIn } from '@/lib/actions/checkin'
+import { checkInGuest, verifyAndCheckIn } from '@/lib/actions/checkin'
+import { formatCheckinTime } from '@/lib/utils'
 import {
   cacheGuestList,
   getCachedGuestList,

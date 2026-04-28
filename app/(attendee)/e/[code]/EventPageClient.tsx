@@ -183,7 +183,7 @@ export default function EventPageClient({
         </div>
       ) : (
         /* Free RSVP sticky CTA */
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-surface-container-lowest flex items-center gap-4">
+        <div className="fixed bottom-20 left-0 right-0 z-40 p-4 bg-surface-container-lowest flex items-center gap-4">
           <span className="text-on-surface-variant text-sm">Free Event</span>
           <Button
             className="flex-1"
