@@ -6,17 +6,36 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import Image from 'next/image'
 
+async function compressImage(file: File, maxPx = 1200, quality = 0.82): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob((blob) => {
+        resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file)
+      }, 'image/jpeg', quality)
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
+
 export default function NewEventPage() {
   const router = useRouter()
   const [preview, setPreview] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const compressedFileRef = useRef<File | null>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setPreview(URL.createObjectURL(file))
+    compressImage(file).then((compressed) => { compressedFileRef.current = compressed })
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -28,6 +47,9 @@ export default function NewEventPage() {
     const formData = new FormData(form)
     const publish = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('data-action') === 'publish'
     formData.set('publish', String(publish))
+    if (compressedFileRef.current) {
+      formData.set('coverImage', compressedFileRef.current)
+    }
 
     try {
       const res = await fetch('/api/events', { method: 'POST', body: formData })
