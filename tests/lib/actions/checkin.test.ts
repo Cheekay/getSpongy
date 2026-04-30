@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { isDuplicateCheckIn, formatCheckinTime } from '@/lib/actions/checkin'
+import { isDuplicateCheckIn, formatCheckinTime } from '@/lib/utils'
 
 describe('isDuplicateCheckIn', () => {
   it('returns true for checked_in status', () => {

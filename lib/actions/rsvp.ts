@@ -4,11 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { signQrJwt, isQrJwtNearExpiry } from '@/lib/jwt'
 import { revalidatePath } from 'next/cache'
-
-export function isEventAtCapacity(capacity: number | null, rsvpCount: number): boolean {
-  if (capacity === null) return false
-  return rsvpCount >= capacity
-}
+import { isEventAtCapacity } from '@/lib/utils'
 
 export async function rsvpToEvent(eventId: string): Promise<{
   error?: string

@@ -13,3 +13,12 @@ export function formatCheckinTime(checkedInAt: string | null): string {
     hour12: true,
   })
 }
+
+export function isDuplicateCheckIn(status: string): boolean {
+  return status === 'checked_in'
+}
+
+export function isEventAtCapacity(capacity: number | null, rsvpCount: number): boolean {
+  if (capacity === null) return false
+  return rsvpCount >= capacity
+}

@@ -3,19 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { verifyQrJwt } from '@/lib/jwt'
-
-export function isDuplicateCheckIn(status: string): boolean {
-  return status === 'checked_in'
-}
-
-export function formatCheckinTime(checkedInAt: string | null): string {
-  if (!checkedInAt) return ''
-  return new Date(checkedInAt).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
+import { isDuplicateCheckIn } from '@/lib/utils'
 
 export type GuestRow = {
   id: string

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isEventAtCapacity } from '@/lib/actions/rsvp'
+import { isEventAtCapacity } from '@/lib/utils'
 
 describe('isEventAtCapacity', () => {
   it('returns false when capacity is null (unlimited)', () => {
