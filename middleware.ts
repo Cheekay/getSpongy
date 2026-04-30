@@ -13,8 +13,9 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   let user = null
+  let supabase: ReturnType<typeof createServerClient> | null = null
   try {
-    const supabase = createServerClient(
+    supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
@@ -49,7 +50,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (user) {
+  if (user && supabase) {
     const { data: profile } = await supabase
       .from('users')
       .select('role_flags')
