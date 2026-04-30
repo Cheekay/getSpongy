@@ -83,15 +83,14 @@ describe('searchTracks', () => {
     expect(results[0].albumArtUrl).toBeNull()
   })
 
-  it('returns empty array when Spotify search response is not ok', async () => {
+  it('throws when Spotify search response is not ok', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ access_token: 'tok', expires_in: 3600 }),
     })
-    mockFetch.mockResolvedValueOnce({ ok: false, json: async () => ({}) })
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
 
     const { searchTracks } = await import('@/lib/spotify')
-    const results = await searchTracks('anything')
-    expect(results).toEqual([])
+    await expect(searchTracks('anything')).rejects.toThrow('Spotify search failed: 503')
   })
 })
