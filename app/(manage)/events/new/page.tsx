@@ -28,6 +28,7 @@ export default function NewEventPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [compressing, setCompressing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const compressedFileRef = useRef<File | null>(null)
 
@@ -35,7 +36,11 @@ export default function NewEventPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setPreview(URL.createObjectURL(file))
-    compressImage(file).then((compressed) => { compressedFileRef.current = compressed })
+    setCompressing(true)
+    compressImage(file).then((compressed) => {
+      compressedFileRef.current = compressed
+      setCompressing(false)
+    })
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -156,16 +161,16 @@ export default function NewEventPage() {
           <Button
             type="submit"
             data-action="publish"
-            disabled={submitting}
+            disabled={submitting || compressing}
             className="w-full"
           >
-            {submitting ? 'Publishing…' : 'Publish Event'}
+            {compressing ? 'Processing image…' : submitting ? 'Publishing…' : 'Publish Event'}
           </Button>
           <Button
             type="submit"
             data-action="draft"
             variant="secondary"
-            disabled={submitting}
+            disabled={submitting || compressing}
             className="w-full"
           >
             Save Draft
