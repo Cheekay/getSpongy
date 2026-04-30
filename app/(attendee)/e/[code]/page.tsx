@@ -43,8 +43,7 @@ export default async function EventCodePage({ params }: Props) {
     .from('events')
     .select(`
       id, title, description, cover_image_url, start_at, end_at, timezone,
-      venue_name, state, capacity, event_code, rsvp_type,
-      organizer:users!organizer_id(name)
+      venue_name, state, capacity, event_code, rsvp_type
     `)
     .eq('event_code', code)
     .neq('state', 'draft')
