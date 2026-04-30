@@ -19,7 +19,7 @@ describe('stripe singleton', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_dummy'
     const { stripe } = await import('@/lib/stripe')
     expect(stripe).toBeDefined()
-    expect(stripe).toBeInstanceOf(Stripe)
+    // stripe is a Proxy — verify it forwards to the underlying Stripe instance
     expect((stripe as any).key).toBe('sk_test_dummy')
     expect((stripe as any).options).toEqual(expect.objectContaining({
       apiVersion: '2026-03-25.dahlia',
