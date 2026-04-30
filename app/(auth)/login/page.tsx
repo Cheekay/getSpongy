@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { sendOtp } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -17,7 +17,7 @@ function SubmitButton() {
   )
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/explore'
   const router = useRouter()
@@ -33,6 +33,31 @@ export default function LoginPage() {
   }, [state, redirectTo, router])
 
   return (
+    <form action={action} className="space-y-4">
+      <input type="hidden" name="redirectTo" value={redirectTo} />
+      <div className="flex gap-2">
+        <span className="flex items-center px-3 rounded-sm bg-surface-container-highest text-on-surface-variant text-sm">
+          +1
+        </span>
+        <Input
+          name="phone"
+          type="tel"
+          placeholder="(555) 000-0000"
+          autoComplete="tel"
+          className="flex-1"
+          required
+        />
+      </div>
+      {state.error && (
+        <p className="text-error text-sm">{state.error}</p>
+      )}
+      <SubmitButton />
+    </form>
+  )
+}
+
+export default function LoginPage() {
+  return (
     <main className="flex-1 flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2">
@@ -42,26 +67,9 @@ export default function LoginPage() {
           <p className="text-on-surface-variant">Enter your number to get started</p>
         </div>
 
-        <form action={action} className="space-y-4">
-          <input type="hidden" name="redirectTo" value={redirectTo} />
-          <div className="flex gap-2">
-            <span className="flex items-center px-3 rounded-sm bg-surface-container-highest text-on-surface-variant text-sm">
-              +1
-            </span>
-            <Input
-              name="phone"
-              type="tel"
-              placeholder="(555) 000-0000"
-              autoComplete="tel"
-              className="flex-1"
-              required
-            />
-          </div>
-          {state.error && (
-            <p className="text-error text-sm">{state.error}</p>
-          )}
-          <SubmitButton />
-        </form>
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
 
         <p className="text-on-surface-variant text-xs text-center">
           We'll send a one-time code via SMS.

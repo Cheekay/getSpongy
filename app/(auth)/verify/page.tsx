@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
+import { Suspense } from 'react'
 import { verifyOtp } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/Button'
 import { useSearchParams } from 'next/navigation'
@@ -16,7 +17,7 @@ function SubmitButton() {
   )
 }
 
-export default function VerifyPage() {
+function VerifyForm() {
   const searchParams = useSearchParams()
   const phone = searchParams.get('phone') || ''
   const redirectTo = searchParams.get('redirect') || '/explore'
@@ -24,47 +25,57 @@ export default function VerifyPage() {
   const [state, action] = useActionState(verifyOtp, {})
 
   return (
+    <>
+      <p className="text-on-surface-variant">
+        We sent a code to{' '}
+        <span className="text-primary">{phone || 'your phone'}</span>
+      </p>
+
+      <form action={action} className="space-y-4">
+        <input type="hidden" name="phone" value={phone} />
+        <input type="hidden" name="redirectTo" value={redirectTo} />
+        <input
+          name="token"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]{6}"
+          maxLength={6}
+          placeholder="000000"
+          autoComplete="one-time-code"
+          className="w-full text-center text-2xl tracking-widest rounded-sm bg-surface-container-highest px-4 py-3 text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary"
+          required
+        />
+        {state.error && (
+          <p className="text-error text-sm">{state.error}</p>
+        )}
+        <SubmitButton />
+      </form>
+
+      <div className="text-center space-y-1">
+        <p className="text-on-surface-variant text-sm">
+          Didn't get it?{' '}
+          <Link
+            href={`/login?redirect=${encodeURIComponent(redirectTo)}`}
+            className="text-secondary"
+          >
+            Resend code
+          </Link>
+        </p>
+      </div>
+    </>
+  )
+}
+
+export default function VerifyPage() {
+  return (
     <main className="flex-1 flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-2">
           <h1 className="font-headline text-3xl font-bold">Check your texts</h1>
-          <p className="text-on-surface-variant">
-            We sent a code to{' '}
-            <span className="text-primary">{phone || 'your phone'}</span>
-          </p>
         </div>
-
-        <form action={action} className="space-y-4">
-          <input type="hidden" name="phone" value={phone} />
-          <input type="hidden" name="redirectTo" value={redirectTo} />
-          <input
-            name="token"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            placeholder="000000"
-            autoComplete="one-time-code"
-            className="w-full text-center text-2xl tracking-widest rounded-sm bg-surface-container-highest px-4 py-3 text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary"
-            required
-          />
-          {state.error && (
-            <p className="text-error text-sm">{state.error}</p>
-          )}
-          <SubmitButton />
-        </form>
-
-        <div className="text-center space-y-1">
-          <p className="text-on-surface-variant text-sm">
-            Didn't get it?{' '}
-            <Link
-              href={`/login?redirect=${encodeURIComponent(redirectTo)}`}
-              className="text-secondary"
-            >
-              Resend code
-            </Link>
-          </p>
-        </div>
+        <Suspense fallback={null}>
+          <VerifyForm />
+        </Suspense>
       </div>
     </main>
   )
